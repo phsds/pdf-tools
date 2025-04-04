@@ -53,25 +53,10 @@ def activation():
     driver = webdriver.Chrome(options=chrome_options)
     return driver
 
-def pdf24 (browser):
-
-    browser.get("https://tools.pdf24.org/pt/pdf-para-imagens")
-
-    #browser.maximize_window()
-
-    button = browser.find_element("class name", "btn")
-    button.click()
-    sleep(10)
-    conversion = browser.find_element(By.XPATH, "//a[@class='btn action']")
-    conversion.click()
-    #download = browser.find_element(By.XPATH, "//a[@id='downloadTool']")
-    #sleep(10)
-    #download.click()
-    
-    #Consertar a última parte
-
-
 def Pen_to_Print(browser):
+    #activating the images
+    convert_pdf_pages_to_images("teste-pdfs", "output-images")
+    
     folder_path = os.path.abspath("output-images")  # Caminho para a pasta "output-images"
     
     # Lista todas as subpastas dentro de "output-images"
@@ -133,5 +118,3 @@ def Pen_to_Print(browser):
 
 # Executa a função
 Pen_to_Print(activation())
-# Exemplo de uso
-#convert_pdf_pages_to_images("teste-pdfs", "output-images")
