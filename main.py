@@ -1,6 +1,8 @@
 import os
 import sys
 import subprocess
+import tools
+from art import tprint
 
 def activate_and_run():
     venv_dir = os.path.abspath(".\\execution\\Scripts\\activate.bat")
@@ -22,10 +24,6 @@ if __name__ == "__main__":
     if "VIRTUAL_ENV" not in os.environ:
         activate_and_run()
         sys.exit(0)
-
-    # Código principal do programa
-    import tools
-    from art import tprint
 
     tprint("-PDF-Tools", font="avatar")
 
