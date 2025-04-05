@@ -1,10 +1,22 @@
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from docx import Document
 from time import sleep
 import fitz
 import os
+
+images_path = 'output-images/'
+
+def check_path_images():
+    if not os.path.exists(images_path):
+        print('output-images directory not found, creating one putting the images in it.')
+        convert_pdf_pages_to_images("teste-pdfs", "output-images")
+    else:
+        print("Directory already created.")
+        pass
 
 def convert_pdf_pages_to_images(input_folder, output_folder="output-images", zoom=4.0, image_format="png"):
     """
@@ -48,28 +60,57 @@ def convert_pdf_pages_to_images(input_folder, output_folder="output-images", zoo
         print(f"PDF '{pdf_file}' convertido e salvo em '{pdf_output_folder}'.")
 
 def activation():
+    check_path_images()
     chrome_options = Options()
     chrome_options.add_experimental_option("detach", True)
     driver = webdriver.Chrome(options=chrome_options)
     return driver
 
 def Pen_to_Print(browser):
-    #activating the images
-    convert_pdf_pages_to_images("teste-pdfs", "output-images")
-    
-    folder_path = os.path.abspath("output-images")  # Caminho para a pasta "output-images"
-    
+    # Realiza o login no site
+    print("Iniciando login no site...")
+    browser.get("https://www.pen-to-print.com/App/notes/")  # Abre a página inicial
+    sleep(3)  # Aguarda o carregamento da página
+
+    # Passo 1: Localiza e clica no botão "Log in"
+    wait = WebDriverWait(browser, 10)  # Aguarda até 10 segundos
+    login_button = wait.until(EC.element_to_be_clickable((By.XPATH, "//div[text()='Log in']")))
+    login_button.click()
+    print("Botão de login clicado e popup aberto.")
+
+    # Passo 2: Aguarda o popup de login e preenche os campos
+    email_input = wait.until(EC.presence_of_element_located((By.NAME, "email")))
+    email_input.send_keys("pdfferramenta@outlook.com")
+
+    password_input = wait.until(EC.presence_of_element_located((By.NAME, "password")))
+    password_input.send_keys("Gmo2Ha5z2!rio@by@Vb22hE68yj^eQKyWR%P9BB8C!58vNmjV899oTDA8CXZ82^&")
+
+    # Clica no botão "Login" dentro do popup
+    popup_login_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, ".login-button button[type='submit']")))
+    popup_login_button.click()
+    print("Login realizado com sucesso!")
+    sleep(5)  # Aguarda o login ser processado
+
+    # Caminho para a pasta "output-images"
+    folder_path = os.path.abspath("output-images")
+
+    # Verifica se a pasta "output-images" existe, caso contrário, cria-a
+    if not os.path.exists(folder_path):
+        print(f"A pasta '{folder_path}' não existe. Criando...")
+        os.makedirs(folder_path)
+
     # Lista todas as subpastas dentro de "output-images"
     subfolders = [os.path.join(folder_path, d) for d in os.listdir(folder_path) if os.path.isdir(os.path.join(folder_path, d))]
 
     for subfolder in subfolders:
+        print(f"Processando subpasta: {subfolder}")
         # Lista todos os arquivos PNG na subpasta atual
         png_files = [os.path.join(subfolder, f) for f in sorted(os.listdir(subfolder)) if f.endswith(".png")]
 
         # Processa os arquivos em lotes de 50
         batch_size = 50
         total_files = len(png_files)
-        current_index = 0
+        current_index = 0  # Reinicia o índice para cada subpasta
 
         while current_index < total_files:
             # Abre o site para cada lote
@@ -80,37 +121,54 @@ def Pen_to_Print(browser):
             batch_files = png_files[current_index:current_index + batch_size]
 
             for png_file in batch_files:
-                # Recarrega o elemento de upload para cada arquivo
-                upload_input = browser.find_element(By.CSS_SELECTOR, "input[type='file']")
-                
-                # Limpa o campo de upload antes de enviar o próximo arquivo
-                browser.execute_script("arguments[0].value = '';", upload_input)
-                
-                # Envia o arquivo atual
-                upload_input.send_keys(png_file)
-                sleep(1)  # Aguarda um momento para o upload
+                print(f"Enviando arquivo: {png_file}")  # Mensagem de depuração
+                try:
+                    # Recarrega o elemento de upload para cada arquivo
+                    upload_input = browser.find_element(By.CSS_SELECTOR, "input[type='file']")
+                    
+                    # Limpa o campo de upload antes de enviar o próximo arquivo
+                    browser.execute_script("arguments[0].value = '';", upload_input)
+                    
+                    # Envia o arquivo atual
+                    upload_input.send_keys(png_file)
+                    sleep(1)  # Aguarda um momento para o upload
+                except Exception as e:
+                    print(f"Erro ao enviar o arquivo {png_file}: {e}")
+                    continue  # Continua com o próximo arquivo
 
             # Clica no botão "convert-button"
-            button = browser.find_element(By.CLASS_NAME, "convert-button")
-            button.click()
-            sleep(6)
+            try:
+                button = browser.find_element(By.CLASS_NAME, "convert-button")
+                button.click()
+                sleep(6)
+            except Exception as e:
+                print(f"Erro ao clicar no botão de conversão: {e}")
+                continue
 
             # Seleciona o botão "word"
-            button = browser.find_element(By.ID, "word")
-            browser.execute_script("arguments[0].click();", button)
-            sleep(5)  # Aguarda o processamento
+            try:
+                button = browser.find_element(By.ID, "word")
+                browser.execute_script("arguments[0].click();", button)
+                sleep(5)  # Aguarda o processamento
+            except Exception as e:
+                print(f"Erro ao clicar no botão 'word': {e}")
+                continue
 
             # Localiza o elemento <textarea> e extrai o texto
-            textarea = browser.find_element(By.CLASS_NAME, "scanline-cell-content")
-            text_content = textarea.get_attribute("value")  # Usa "value" para capturar o conteúdo do <textarea>
+            try:
+                textarea = browser.find_element(By.CLASS_NAME, "scanline-cell-content")
+                text_content = textarea.get_attribute("value")  # Usa "value" para capturar o conteúdo do <textarea>
 
-            # Salva o texto extraído em um arquivo Word
-            doc = Document()  # Cria um novo documento Word
-            doc.add_paragraph(text_content)  # Adiciona o texto extraído como um parágrafo
-            output_file = f".\\results\\{os.path.basename(subfolder)}_lote_{current_index // batch_size + 1}.docx"
-            doc.save(output_file)  # Salva o documento no formato .docx
+                # Salva o texto extraído em um arquivo Word
+                doc = Document()  # Cria um novo documento Word
+                doc.add_paragraph(text_content)  # Adiciona o texto extraído como um parágrafo
+                output_file = f".\\results\\{os.path.basename(subfolder)}_lote_{current_index // batch_size + 1}.docx"
+                doc.save(output_file)  # Salva o documento no formato .docx
 
-            print(f"Texto extraído e salvo em '{output_file}'.")
+                print(f"Texto extraído e salvo em '{output_file}'.")
+            except Exception as e:
+                print(f"Erro ao extrair ou salvar o texto: {e}")
+                continue
 
             # Atualiza o índice para o próximo lote
             current_index += batch_size
