@@ -3,6 +3,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from PIL import Image
 from docx import Document
 from time import sleep
 import fitz
@@ -20,15 +21,15 @@ def check_path_images():
 
 def convert_pdf_pages_to_images(input_folder, output_folder="output-images", zoom=4.0, image_format="png"):
     """
-    Converte páginas de PDFs em imagens com alta qualidade.
+    Converte páginas de PDFs em imagens com alta qualidade e verifica dimensões para dividir imagens largas.
     
     Args:
         input_folder (str): Pasta contendo os PDFs de entrada.
-        output_folder (str): Pasta onde as imagens serão salvas (fora de "teste-pdfs").
+        output_folder (str): Pasta onde as imagens serão salvas.
         zoom (float): Fator de zoom para aumentar a qualidade (padrão: 4.0).
         image_format (str): Formato da imagem de saída (padrão: "png").
     """
-    # Cria a pasta de saída fora de "teste-pdfs"
+    # Cria a pasta de saída
     os.makedirs(output_folder, exist_ok=True)
 
     # Lista todos os arquivos PDF na pasta de entrada
@@ -44,21 +45,70 @@ def convert_pdf_pages_to_images(input_folder, output_folder="output-images", zoo
         # Abre o PDF
         pdf_document = fitz.open(pdf_file)
         total_pages = len(pdf_document)  # Número total de páginas no PDF
-        padding = len(str(total_pages - 1))  # Calcula o número de dígitos necessários para zero-padding
 
         for page_number in range(total_pages):
-            # Renderiza a página como uma imagem com alta qualidade
-            page = pdf_document[page_number]
-            matrix = fitz.Matrix(zoom, zoom)  # Aumenta a resolução da imagem
-            pix = page.get_pixmap(matrix=matrix)
-
-            # Salva a imagem com zero-padding no nome
-            output_image_path = os.path.join(pdf_output_folder, f"{str(page_number).zfill(padding)}.{image_format}")
-            pix.save(output_image_path)
+            output_image_path = os.path.join(pdf_output_folder, f"{str(page_number).zfill(3)}.{image_format}")
+            try:
+                # Renderiza a página como uma imagem com alta qualidade
+                page = pdf_document[page_number]
+                pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom))
+                pix.save(output_image_path)
+                print(f"Página {page_number} salva como {output_image_path}")
+            except Exception as e:
+                print(f"Erro ao renderizar a página {page_number}: {e}")
+                print(f"Tentando reextrair a página {page_number} do PDF...")
+                try:
+                    # Tenta reextrair a página e salva sem aplicar separação
+                    page = pdf_document[page_number]
+                    pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom))
+                    pix.save(output_image_path)
+                    print(f"Página {page_number} reextraída e salva como {output_image_path} (sem separação)")
+                except Exception as re_extraction_error:
+                    print(f"Erro ao reextrair a página {page_number}: {re_extraction_error}")
+                    continue
 
         pdf_document.close()
-        print(f"PDF '{pdf_file}' convertido e salvo em '{pdf_output_folder}'.")
 
+        # Verifica e divide imagens largas na subpasta
+        print(f"Verificando imagens na subpasta '{pdf_output_folder}'...")
+        image_files = [os.path.join(pdf_output_folder, f) for f in os.listdir(pdf_output_folder) if f.endswith(f".{image_format}")]
+        for image_file in image_files:
+            try:
+                # Verifica se o arquivo existe e não está vazio
+                if not os.path.exists(image_file) or os.path.getsize(image_file) == 0:
+                    print(f"Erro: Arquivo '{image_file}' está vazio ou não existe. Tentando reextrair...")
+                    page_number = int(os.path.basename(image_file).split('.')[0])  # Obtém o número da página
+                    page = pdf_document[page_number]
+                    pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom))
+                    pix.save(image_file)
+                    print(f"Página {page_number} reextraída e salva como {image_file} (sem separação)")
+                    continue
+
+                with Image.open(image_file) as img:
+                    width, height = img.size
+                    if width > height:
+                        print(f"Imagem '{image_file}' é larga. Dividindo...")
+
+                        # Divide a imagem em duas partes (esquerda e direita)
+                        left_image = img.crop((0, 0, width // 2, height))  # Parte esquerda
+                        right_image = img.crop((width // 2, 0, width, height))  # Parte direita
+
+                        # Salva as partes divididas
+                        left_image_path = image_file.replace(f".{image_format}", f"_left.{image_format}")
+                        right_image_path = image_file.replace(f".{image_format}", f"_right.{image_format}")
+                        left_image.save(left_image_path)
+                        right_image.save(right_image_path)
+                        print(f"Imagem dividida salva como '{left_image_path}' e '{right_image_path}'")
+
+                        # Remove a imagem original
+                        os.remove(image_file)
+                    else:
+                        print(f"Imagem '{image_file}' não precisa ser dividida.")
+            except Exception as e:
+                print(f"Erro ao processar a imagem '{image_file}': {e}")
+
+    print("Processamento concluído.")
+        
 def activation():
     check_path_images()
     chrome_options = Options()
@@ -220,3 +270,5 @@ def Pen_to_Print(browser):
     
 # Executa a função
 Pen_to_Print(activation())
+
+#convert_pdf_pages_to_images("teste-pdfs", "output-images")
