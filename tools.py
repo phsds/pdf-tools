@@ -15,12 +15,12 @@ merger = PdfMerger()
 #HINT : The directory where pdf(s) file(s) are putted is "pdfs".
 #Create "path" and results" directory where saved pdfs will go.
 def mkdir_pdfs():
-	if not os.path.exists(path):
-		os.mkdir(path)
+    if not os.path.exists(path):
+        os.mkdir(path)
 
 def mkdir_results():
-	if not os.path.exists(results):
-		os.mkdir(results)
+    if not os.path.exists(results):
+        os.mkdir(results)
 
 #Check if the directory "path" have something in it, this function will substitute the bug of PyPDF2 where no FileNotFoundError errors are showed.
 def check_path():
@@ -29,7 +29,7 @@ def check_path():
         mkdir_pdfs()
         mkdir_results()
     else:
-        print("Pastas já criadas.")
+        print("Folders already created.")
         pass
 
 def check_pdfs():
@@ -65,7 +65,7 @@ def extractImage():
                         except:
                             os.remove(img_file_obj.name)
     except Exception as err:
-        print("houve algum erro com a formatação do pdf que não deu para extrair todas as imagens.")
+        print("There was an error with the PDF formatting, and it was not possible to extract all images.")
         print(f"\n {err}")
     print('\nAll done!')
 

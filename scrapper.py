@@ -13,7 +13,7 @@ images_path = 'output-images/'
 
 def check_path_images():
     if not os.path.exists(images_path):
-        print('output-images directory not found, creating one putting the images in it.')
+        print('output-images directory not found, creating one and putting the images in it.')
         convert_pdf_pages_to_images("teste-pdfs", "output-images")
     else:
         print("Directory already created.")
@@ -21,93 +21,93 @@ def check_path_images():
 
 def convert_pdf_pages_to_images(input_folder, output_folder="output-images", zoom=4.0, image_format="png"):
     """
-    Converte páginas de PDFs em imagens com alta qualidade e verifica dimensões para dividir imagens largas.
+    Converts PDF pages into high-quality images and checks dimensions to split wide images.
     
     Args:
-        input_folder (str): Pasta contendo os PDFs de entrada.
-        output_folder (str): Pasta onde as imagens serão salvas.
-        zoom (float): Fator de zoom para aumentar a qualidade (padrão: 4.0).
-        image_format (str): Formato da imagem de saída (padrão: "png").
+        input_folder (str): Folder containing the input PDFs.
+        output_folder (str): Folder where the images will be saved.
+        zoom (float): Zoom factor to increase quality (default: 4.0).
+        image_format (str): Output image format (default: "png").
     """
-    # Cria a pasta de saída
+    # Creates the output folder
     os.makedirs(output_folder, exist_ok=True)
 
-    # Lista todos os arquivos PDF na pasta de entrada
+    # Lists all PDF files in the input folder
     pdf_files = [os.path.join(input_folder, f) for f in os.listdir(input_folder) if f.endswith(".pdf")]
 
     for pdf_file in pdf_files:
-        # Nome do PDF sem extensão
+        # PDF name without extension
         pdf_name = os.path.splitext(os.path.basename(pdf_file))[0]
-        # Cria uma pasta para o PDF atual dentro de "output-images"
+        # Creates a folder for the current PDF inside "output-images"
         pdf_output_folder = os.path.join(output_folder, pdf_name)
         os.makedirs(pdf_output_folder, exist_ok=True)
 
-        # Abre o PDF
+        # Opens the PDF
         pdf_document = fitz.open(pdf_file)
-        total_pages = len(pdf_document)  # Número total de páginas no PDF
+        total_pages = len(pdf_document)  # Total number of pages in the PDF
 
         for page_number in range(total_pages):
             output_image_path = os.path.join(pdf_output_folder, f"{str(page_number).zfill(3)}.{image_format}")
             try:
-                # Renderiza a página como uma imagem com alta qualidade
+                # Renders the page as a high-quality image
                 page = pdf_document[page_number]
                 pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom))
                 pix.save(output_image_path)
-                print(f"Página {page_number} salva como {output_image_path}")
+                print(f"Page {page_number} saved as {output_image_path}")
             except Exception as e:
-                print(f"Erro ao renderizar a página {page_number}: {e}")
-                print(f"Tentando reextrair a página {page_number} do PDF...")
+                print(f"Error rendering page {page_number}: {e}")
+                print(f"Trying to re-extract page {page_number} from the PDF...")
                 try:
-                    # Tenta reextrair a página e salva sem aplicar separação
+                    # Attempts to re-extract the page and save without splitting
                     page = pdf_document[page_number]
                     pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom))
                     pix.save(output_image_path)
-                    print(f"Página {page_number} reextraída e salva como {output_image_path} (sem separação)")
+                    print(f"Page {page_number} re-extracted and saved as {output_image_path} (without splitting)")
                 except Exception as re_extraction_error:
-                    print(f"Erro ao reextrair a página {page_number}: {re_extraction_error}")
+                    print(f"Error re-extracting page {page_number}: {re_extraction_error}")
                     continue
 
         pdf_document.close()
 
-        # Verifica e divide imagens largas na subpasta
-        print(f"Verificando imagens na subpasta '{pdf_output_folder}'...")
+        # Checks and splits wide images in the subfolder
+        print(f"Checking images in the subfolder '{pdf_output_folder}'...")
         image_files = [os.path.join(pdf_output_folder, f) for f in os.listdir(pdf_output_folder) if f.endswith(f".{image_format}")]
         for image_file in image_files:
             try:
-                # Verifica se o arquivo existe e não está vazio
+                # Checks if the file exists and is not empty
                 if not os.path.exists(image_file) or os.path.getsize(image_file) == 0:
-                    print(f"Erro: Arquivo '{image_file}' está vazio ou não existe. Tentando reextrair...")
-                    page_number = int(os.path.basename(image_file).split('.')[0])  # Obtém o número da página
+                    print(f"Error: File '{image_file}' is empty or does not exist. Trying to re-extract...")
+                    page_number = int(os.path.basename(image_file).split('.')[0])  # Gets the page number
                     page = pdf_document[page_number]
                     pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom))
                     pix.save(image_file)
-                    print(f"Página {page_number} reextraída e salva como {image_file} (sem separação)")
+                    print(f"Page {page_number} re-extracted and saved as {image_file} (without splitting)")
                     continue
 
                 with Image.open(image_file) as img:
                     width, height = img.size
                     if width > height:
-                        print(f"Imagem '{image_file}' é larga. Dividindo...")
+                        print(f"Image '{image_file}' is wide. Splitting...")
 
-                        # Divide a imagem em duas partes (esquerda e direita)
-                        left_image = img.crop((0, 0, width // 2, height))  # Parte esquerda
-                        right_image = img.crop((width // 2, 0, width, height))  # Parte direita
+                        # Splits the image into two parts (left and right)
+                        left_image = img.crop((0, 0, width // 2, height))  # Left part
+                        right_image = img.crop((width // 2, 0, width, height))  # Right part
 
-                        # Salva as partes divididas
+                        # Saves the split parts
                         left_image_path = image_file.replace(f".{image_format}", f"_left.{image_format}")
                         right_image_path = image_file.replace(f".{image_format}", f"_right.{image_format}")
                         left_image.save(left_image_path)
                         right_image.save(right_image_path)
-                        print(f"Imagem dividida salva como '{left_image_path}' e '{right_image_path}'")
+                        print(f"Split image saved as '{left_image_path}' and '{right_image_path}'")
 
-                        # Remove a imagem original
+                        # Removes the original image
                         os.remove(image_file)
                     else:
-                        print(f"Imagem '{image_file}' não precisa ser dividida.")
+                        print(f"Image '{image_file}' does not need to be split.")
             except Exception as e:
-                print(f"Erro ao processar a imagem '{image_file}': {e}")
+                print(f"Error processing image '{image_file}': {e}")
 
-    print("Processamento concluído.")
+    print("Processing completed.")
         
 def activation():
     check_path_images()
@@ -117,59 +117,59 @@ def activation():
     return driver
 
 def Pen_to_Print(browser):
-    # Realiza o login no site
-    print("Iniciando login no site...")
-    browser.get("https://www.pen-to-print.com/App/notes/")  # Abre a página inicial
-    sleep(3)  # Aguarda o carregamento da página
+    # Logs into the website
+    print("Starting login on the website...")
+    browser.get("https://www.pen-to-print.com/App/notes/")  # Opens the homepage
+    sleep(3)  # Waits for the page to load
 
-    # Clica no botão "Accept cookies" antes de continuar
+    # Clicks the "Accept cookies" button before continuing
     try:
         accept_button = WebDriverWait(browser, 10).until(
             EC.element_to_be_clickable((By.ID, "rcc-confirm-button"))
         )
         browser.execute_script("arguments[0].click();", accept_button)
-        print("Botão 'Accept cookies' clicado com sucesso.")
+        print("'Accept cookies' button clicked successfully.")
     except Exception as e:
-        print(f"Erro ao clicar no botão 'Accept cookies': {e}")
+        print(f"Error clicking the 'Accept cookies' button: {e}")
 
-    # Passo 1: Localiza e clica no botão "Log in"
-    wait = WebDriverWait(browser, 10)  # Aguarda até 10 segundos
+    # Step 1: Locates and clicks the "Log in" button
+    wait = WebDriverWait(browser, 10)  # Waits up to 10 seconds
     login_button = wait.until(EC.element_to_be_clickable((By.XPATH, "//div[text()='Log in']")))
     login_button.click()
-    print("Botão de login clicado e popup aberto.")
+    print("Login button clicked and popup opened.")
 
-    # Passo 2: Aguarda o popup de login e preenche os campos
+    # Step 2: Waits for the login popup and fills in the fields
     email_input = wait.until(EC.presence_of_element_located((By.NAME, "email")))
     email_input.send_keys("pdfferramenta@outlook.com")
 
     password_input = wait.until(EC.presence_of_element_located((By.NAME, "password")))
     password_input.send_keys("Gmo2Ha5z2!rio@by@Vb22hE68yj^eQKyWR%P9BB8C!58vNmjV899oTDA8CXZ82^&")
 
-    # Clica no botão "Login" dentro do popup
+    # Clicks the "Login" button inside the popup
     popup_login_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, ".login-button button[type='submit']")))
     popup_login_button.click()
-    print("Login realizado com sucesso!")
-    sleep(5)  # Aguarda o login ser processado
+    print("Login successful!")
+    sleep(5)  # Waits for the login to be processed
 
-    # Caminho para a pasta "output-images"
+    # Path to the "output-images" folder
     folder_path = os.path.abspath("output-images")
 
-    # Verifica se a pasta "output-images" existe, caso contrário, cria-a
+    # Checks if the "output-images" folder exists, otherwise creates it
     if not os.path.exists(folder_path):
-        print(f"A pasta '{folder_path}' não existe. Criando...")
+        print(f"The folder '{folder_path}' does not exist. Creating...")
         os.makedirs(folder_path)
 
-    # Lista todas as subpastas dentro de "output-images"
+    # Lists all subfolders inside "output-images"
     subfolders = [os.path.join(folder_path, d) for d in os.listdir(folder_path) if os.path.isdir(os.path.join(folder_path, d))]
 
     for subfolder in subfolders:
-        print(f"Processando subpasta: {subfolder}")
-        # Lista todos os arquivos PNG na subpasta atual
+        print(f"Processing subfolder: {subfolder}")
+        # Lists all PNG files in the current subfolder
         png_files = [os.path.join(subfolder, f) for f in sorted(os.listdir(subfolder)) if f.endswith(".png")]
 
         total_files = len(png_files)
 
-        # Cria o arquivo Word para salvar o texto extraído
+        # Creates the Word file to save the extracted text
         output_file = os.path.join("results", f"{os.path.basename(subfolder)}.docx")
         os.makedirs("results", exist_ok=True)
         doc = Document()
@@ -180,19 +180,19 @@ def Pen_to_Print(browser):
         while current_index < total_files:
             batch_files = png_files[current_index:current_index + batch_size]
 
-            # Envia os arquivos do lote
+            # Uploads the batch files
             for png_file in batch_files:
-                print(f"Enviando arquivo: {png_file}")
+                print(f"Uploading file: {png_file}")
                 try:
                     upload_input = browser.find_element(By.CSS_SELECTOR, "input[type='file']")
                     browser.execute_script("arguments[0].value = '';", upload_input)
                     upload_input.send_keys(png_file)
                     sleep(1)
                 except Exception as e:
-                    print(f"Erro ao enviar o arquivo {png_file}: {e}")
+                    print(f"Error uploading the file {png_file}: {e}")
                     continue
 
-            # Clica no botão "converter" após enviar o lote
+            # Clicks the "convert" button after uploading the batch
             try:
                 button = WebDriverWait(browser, 30).until(
                     EC.element_to_be_clickable((By.CLASS_NAME, "convert-button"))
@@ -200,15 +200,15 @@ def Pen_to_Print(browser):
                 browser.execute_script("arguments[0].scrollIntoView(true);", button)
                 sleep(1)
                 button.click()
-                print("Botão de conversão clicado. Aguardando processamento...")
+                print("Convert button clicked. Waiting for processing...")
                 WebDriverWait(browser, 30).until(
                     EC.presence_of_element_located((By.CLASS_NAME, "scanline-cell-content"))
                 )
             except Exception as e:
-                print(f"Erro ao clicar no botão de conversão: {e}")
+                print(f"Error clicking the convert button: {e}")
                 continue
 
-            # Extrai o texto das páginas e salva no arquivo Word
+            # Extracts the text from the pages and saves it in the Word file
             try:
                 page_counter = browser.find_element(By.CLASS_NAME, "page-counter").text
                 current_page, total_pages = map(int, page_counter.split(" ")[1].split("/"))
@@ -218,7 +218,7 @@ def Pen_to_Print(browser):
                     text_content = textarea.get_attribute("value")
                     if text_content.strip():
                         doc.add_paragraph(text_content)
-                        doc.add_paragraph("")  # Adiciona um parágrafo vazio para separar as páginas
+                        doc.add_paragraph("")  # Adds an empty paragraph to separate pages
 
                     if current_page < total_pages:
                         next_button = browser.find_element(By.XPATH, "//div[@class='scanline-arrow']/img[@alt='next page']")
@@ -230,38 +230,38 @@ def Pen_to_Print(browser):
                         break
 
                 doc.save(output_file)
-                print(f"Texto extraído e salvo em '{output_file}'.")
+                print(f"Text extracted and saved in '{output_file}'.")
             except Exception as e:
-                print(f"Erro ao navegar ou salvar o texto: {e}")
+                print(f"Error navigating or saving the text: {e}")
                 continue
 
-            # Clica no botão "closeWindowButton" após o processamento do lote
+            # Clicks the "closeWindowButton" after processing the batch
             try:
                 close_button = WebDriverWait(browser, 10).until(
                     EC.element_to_be_clickable((By.CLASS_NAME, "closeWindowButton"))
                 )
                 browser.execute_script("arguments[0].click();", close_button)
-                print("Botão 'closeWindowButton' clicado com sucesso.")
-                sleep(2)  # Aguarda o fechamento da janela
+                print("'closeWindowButton' clicked successfully.")
+                sleep(2)  # Waits for the window to close
             except Exception as e:
-                print(f"Erro ao clicar no botão 'closeWindowButton': {e}")
+                print(f"Error clicking the 'closeWindowButton': {e}")
 
-            # Atualiza o índice para o próximo lote
+            # Updates the index for the next batch
             current_index += batch_size
 
-            # Reinicia o processo para as imagens restantes
+            # Restarts the process for the remaining images
             if current_index < total_files:
-                print("Reiniciando o processo para as imagens restantes...")
+                print("Restarting the process for the remaining images...")
                 browser.get("https://www.pen-to-print.com/App/notes/")
-                sleep(5)  # Aguarda o carregamento da página inicial
+                sleep(5)  # Waits for the homepage to load
 
-        # Após finalizar a subpasta, retorna à URL inicial para processar a próxima subpasta
-        print(f"Subpasta '{subfolder}' processada com sucesso. Retornando à página inicial...")
+        # After finishing the subfolder, returns to the homepage to process the next subfolder
+        print(f"Subfolder '{subfolder}' processed successfully. Returning to the homepage...")
         browser.get("https://www.pen-to-print.com/App/notes/")
-        sleep(5)  # Aguarda o carregamento da página inicial
+        sleep(5)  # Waits for the homepage to load
 
-    print("Processamento concluído para todas as subpastas.")
+    print("Processing completed for all subfolders.")
     browser.quit()
 
-#Executa a função
-#Pen_to_Print(activation())
+if __name__ == "__main__":
+  pass
