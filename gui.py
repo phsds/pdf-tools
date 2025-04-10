@@ -5,6 +5,8 @@ from tkinter import messagebox
 from tkinter.scrolledtext import ScrolledText
 import scrapper
 import time  # Para simular atrasos entre etapas, se necessário
+import threading  # Para executar funções demoradas em threads separados
+
 
 class RedirectOutput:
     """Classe para redirecionar stdout e stderr para o widget de texto."""
@@ -19,6 +21,16 @@ class RedirectOutput:
     def flush(self):
         pass  # Necessário para compatibilidade com sys.stdout e sys.stderr
 
+
+def run_in_thread(func):
+    """Decorator para executar uma função em um thread separado."""
+    def wrapper(*args, **kwargs):
+        thread = threading.Thread(target=func, args=args, kwargs=kwargs)
+        thread.start()
+    return wrapper
+
+
+@run_in_thread
 def text_extraction():
     print('Iniciando extração de texto...\n')
     time.sleep(1)  # Simula uma etapa demorada
@@ -28,6 +40,8 @@ def text_extraction():
     print('Extração de texto concluída.\n')
     messagebox.showinfo("Success", "Text extraction completed!")
 
+
+@run_in_thread
 def image_extraction():
     print('Iniciando extração de imagens...\n')
     time.sleep(1)  # Simula uma etapa demorada
@@ -37,6 +51,8 @@ def image_extraction():
     print('Extração de imagens concluída.\n')
     messagebox.showinfo("Success", "Image extraction completed!")
 
+
+@run_in_thread
 def pdf_merge():
     print('Iniciando combinação de PDFs...\n')
     time.sleep(1)  # Simula uma etapa demorada
@@ -46,6 +62,8 @@ def pdf_merge():
     print('Combinação de PDFs concluída.\n')
     messagebox.showinfo("Success", "PDFs merged successfully!")
 
+
+@run_in_thread
 def pdf_split_combine():
     print('Iniciando divisão e combinação de PDFs...\n')
     time.sleep(1)  # Simula uma etapa demorada
@@ -54,22 +72,39 @@ def pdf_split_combine():
     tools.split_combine()  # Certifique-se de que esta função exibe mensagens de progresso
     print('Divisão e combinação de PDFs concluída.\n')
     messagebox.showinfo("Success", "PDF split and combine completed!")
-    
-def pdf_scrapper():
+
+
+@run_in_thread
+def pdf_requests():
     print('Iniciando conversão de PDFs em JPG e enviando ao site...\n')
     time.sleep(1)  # Simula uma etapa demorada
     scrapper.Pen_to_Print(scrapper.activation())
-    messagebox.showinfo("Success", "PDF split and combine completed!")
+    print('Processamento de PDFs concluído.\n')
+    messagebox.showinfo("Success", "PDF processing completed!")
+
 
 def finish_program():
     print("Encerrando o programa...\n")
     sys.exit(0)
 
+
 def main_menu():
     # Cria a janela principal
     root = tk.Tk()
     root.title("PDF Tools")
-    root.geometry("600x500")
+
+    # Define o tamanho da janela
+    window_width = 600
+    window_height = 500
+
+    # Calcula a posição para abrir a janela no lado direito e ao meio da tela
+    screen_width = root.winfo_screenwidth()
+    screen_height = root.winfo_screenheight()
+    position_x = screen_width - window_width - 50  # 50px de margem do lado direito
+    position_y = (screen_height // 2) - (window_height // 2)  # Centraliza verticalmente
+
+    # Define a geometria da janela
+    root.geometry(f"{window_width}x{window_height}+{position_x}+{position_y}")
 
     # Título
     title_label = tk.Label(root, text="PDF Tools", font=("Helvetica", 16, "bold"))
@@ -87,13 +122,12 @@ def main_menu():
 
     btn_pdf_split_combine = tk.Button(root, text="PDF Split/Combine", command=pdf_split_combine, width=30)
     btn_pdf_split_combine.pack(pady=5)
-    
-    btn_pdf_split_combine = tk.Button(root, text="PDF - Manuscrito", command=pdf_scrapper, width=30)
-    btn_pdf_split_combine.pack(pady=5)
+
+    btn_pdf_requests = tk.Button(root, text="PDF - Manuscrito", command=pdf_requests, width=30)
+    btn_pdf_requests.pack(pady=5)
 
     btn_finish = tk.Button(root, text="Finish Program", command=finish_program, width=30, bg="red", fg="white")
     btn_finish.pack(pady=20)
-    
 
     # Widget de texto para exibir a saída do terminal
     output_text = ScrolledText(root, wrap=tk.WORD, height=15, width=70)
@@ -105,6 +139,7 @@ def main_menu():
 
     # Inicia o loop principal da interface gráfica
     root.mainloop()
+
 
 if __name__ == "__main__":
     main_menu()

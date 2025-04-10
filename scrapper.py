@@ -262,6 +262,6 @@ def Pen_to_Print(browser):
 
     print("Processamento concluído para todas as subpastas.")
     browser.quit()
-    
+
 #Executa a função
-Pen_to_Print(activation())
+#Pen_to_Print(activation())
