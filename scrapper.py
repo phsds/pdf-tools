@@ -169,11 +169,19 @@ def Pen_to_Print(browser):
 
         total_files = len(png_files)
 
-        # Verifica se a subpasta tem mais ou menos de 50 imagens
-        if total_files <= 50:
-            print(f"Subpasta '{subfolder}' tem {total_files} imagens. Processando todas de uma vez.")
-            # Envia todas as imagens de uma vez
-            for png_file in png_files:
+        # Cria o arquivo Word para salvar o texto extraído
+        output_file = os.path.join("results", f"{os.path.basename(subfolder)}.docx")
+        os.makedirs("results", exist_ok=True)
+        doc = Document()
+
+        batch_size = 50
+        current_index = 0
+
+        while current_index < total_files:
+            batch_files = png_files[current_index:current_index + batch_size]
+
+            # Envia os arquivos do lote
+            for png_file in batch_files:
                 print(f"Enviando arquivo: {png_file}")
                 try:
                     upload_input = browser.find_element(By.CSS_SELECTOR, "input[type='file']")
@@ -184,7 +192,7 @@ def Pen_to_Print(browser):
                     print(f"Erro ao enviar o arquivo {png_file}: {e}")
                     continue
 
-            # Clica no botão "converter" após enviar todas as imagens
+            # Clica no botão "converter" após enviar o lote
             try:
                 button = WebDriverWait(browser, 30).until(
                     EC.element_to_be_clickable((By.CLASS_NAME, "convert-button"))
@@ -200,85 +208,60 @@ def Pen_to_Print(browser):
                 print(f"Erro ao clicar no botão de conversão: {e}")
                 continue
 
-            # Navega entre as páginas e salva o conteúdo em um arquivo Word
+            # Extrai o texto das páginas e salva no arquivo Word
             try:
-                # Cria o arquivo Word
-                doc = Document()
                 page_counter = browser.find_element(By.CLASS_NAME, "page-counter").text
                 current_page, total_pages = map(int, page_counter.split(" ")[1].split("/"))
 
                 while current_page <= total_pages:
-                    # Extrai o texto da página atual
                     textarea = browser.find_element(By.CLASS_NAME, "scanline-cell-content")
                     text_content = textarea.get_attribute("value")
                     if text_content.strip():
-                        doc.add_paragraph(text_content)  # Adiciona o texto da página
+                        doc.add_paragraph(text_content)
                         doc.add_paragraph("")  # Adiciona um parágrafo vazio para separar as páginas
 
-                    # Avança para a próxima página, se houver
                     if current_page < total_pages:
                         next_button = browser.find_element(By.XPATH, "//div[@class='scanline-arrow']/img[@alt='next page']")
                         browser.execute_script("arguments[0].click();", next_button)
-                        sleep(2)  # Aguarda o carregamento da próxima página
+                        sleep(2)
                         page_counter = browser.find_element(By.CLASS_NAME, "page-counter").text
                         current_page, total_pages = map(int, page_counter.split(" ")[1].split("/"))
                     else:
                         break
 
-                # Salva o arquivo Word
-                output_file = os.path.join("results", f"{os.path.basename(subfolder)}.docx")
-                os.makedirs("results", exist_ok=True)
                 doc.save(output_file)
                 print(f"Texto extraído e salvo em '{output_file}'.")
             except Exception as e:
                 print(f"Erro ao navegar ou salvar o texto: {e}")
                 continue
 
-        else:
-            print(f"Subpasta '{subfolder}' tem {total_files} imagens. Aplicando regra de lotes de 50.")
-            # Processa os arquivos em lotes de 50
-            batch_size = 50
-            current_index = 0
+            # Clica no botão "closeWindowButton" após o processamento do lote
+            try:
+                close_button = WebDriverWait(browser, 10).until(
+                    EC.element_to_be_clickable((By.CLASS_NAME, "closeWindowButton"))
+                )
+                browser.execute_script("arguments[0].click();", close_button)
+                print("Botão 'closeWindowButton' clicado com sucesso.")
+                sleep(2)  # Aguarda o fechamento da janela
+            except Exception as e:
+                print(f"Erro ao clicar no botão 'closeWindowButton': {e}")
 
-            while current_index < total_files:
-                batch_files = png_files[current_index:current_index + batch_size]
+            # Atualiza o índice para o próximo lote
+            current_index += batch_size
 
-                # Envia os arquivos do lote
-                for png_file in batch_files:
-                    print(f"Enviando arquivo: {png_file}")
-                    try:
-                        upload_input = browser.find_element(By.CSS_SELECTOR, "input[type='file']")
-                        browser.execute_script("arguments[0].value = '';", upload_input)
-                        upload_input.send_keys(png_file)
-                        sleep(1)
-                    except Exception as e:
-                        print(f"Erro ao enviar o arquivo {png_file}: {e}")
-                        continue
+            # Reinicia o processo para as imagens restantes
+            if current_index < total_files:
+                print("Reiniciando o processo para as imagens restantes...")
+                browser.get("https://www.pen-to-print.com/App/notes/")
+                sleep(5)  # Aguarda o carregamento da página inicial
 
-                # Clica no botão "converter" após o envio do lote
-                try:
-                    button = WebDriverWait(browser, 30).until(
-                        EC.element_to_be_clickable((By.CLASS_NAME, "convert-button"))
-                    )
-                    browser.execute_script("arguments[0].scrollIntoView(true);", button)
-                    sleep(1)
-                    button.click()
-                    print("Botão de conversão clicado. Aguardando processamento...")
-                    WebDriverWait(browser, 30).until(
-                        EC.presence_of_element_located((By.CLASS_NAME, "scanline-cell-content"))
-                    )
-                except Exception as e:
-                    print(f"Erro ao clicar no botão de conversão: {e}")
-                    continue
-
-                # Atualiza o índice para o próximo lote
-                current_index += batch_size
-
-        print(f"Subpasta '{subfolder}' processada com sucesso.")
+        # Após finalizar a subpasta, retorna à URL inicial para processar a próxima subpasta
+        print(f"Subpasta '{subfolder}' processada com sucesso. Retornando à página inicial...")
+        browser.get("https://www.pen-to-print.com/App/notes/")
+        sleep(5)  # Aguarda o carregamento da página inicial
 
     print("Processamento concluído para todas as subpastas.")
+    browser.quit()
     
-# Executa a função
+#Executa a função
 Pen_to_Print(activation())
-
-#convert_pdf_pages_to_images("teste-pdfs", "output-images")

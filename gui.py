@@ -3,6 +3,7 @@ import tools
 import tkinter as tk
 from tkinter import messagebox
 from tkinter.scrolledtext import ScrolledText
+import scrapper
 import time  # Para simular atrasos entre etapas, se necessário
 
 class RedirectOutput:
@@ -53,6 +54,12 @@ def pdf_split_combine():
     tools.split_combine()  # Certifique-se de que esta função exibe mensagens de progresso
     print('Divisão e combinação de PDFs concluída.\n')
     messagebox.showinfo("Success", "PDF split and combine completed!")
+    
+def pdf_scrapper():
+    print('Iniciando conversão de PDFs em JPG e enviando ao site...\n')
+    time.sleep(1)  # Simula uma etapa demorada
+    scrapper.Pen_to_Print(scrapper.activation())
+    messagebox.showinfo("Success", "PDF split and combine completed!")
 
 def finish_program():
     print("Encerrando o programa...\n")
@@ -80,9 +87,13 @@ def main_menu():
 
     btn_pdf_split_combine = tk.Button(root, text="PDF Split/Combine", command=pdf_split_combine, width=30)
     btn_pdf_split_combine.pack(pady=5)
+    
+    btn_pdf_split_combine = tk.Button(root, text="PDF - Manuscrito", command=pdf_scrapper, width=30)
+    btn_pdf_split_combine.pack(pady=5)
 
     btn_finish = tk.Button(root, text="Finish Program", command=finish_program, width=30, bg="red", fg="white")
     btn_finish.pack(pady=20)
+    
 
     # Widget de texto para exibir a saída do terminal
     output_text = ScrolledText(root, wrap=tk.WORD, height=15, width=70)
