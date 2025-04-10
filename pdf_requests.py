@@ -122,6 +122,16 @@ def Pen_to_Print(browser):
     browser.get("https://www.pen-to-print.com/App/notes/")  # Abre a página inicial
     sleep(3)  # Aguarda o carregamento da página
 
+    # Clica no botão "Accept cookies" antes de continuar
+    try:
+        accept_button = WebDriverWait(browser, 10).until(
+            EC.element_to_be_clickable((By.ID, "rcc-confirm-button"))
+        )
+        browser.execute_script("arguments[0].click();", accept_button)
+        print("Botão 'Accept cookies' clicado com sucesso.")
+    except Exception as e:
+        print(f"Erro ao clicar no botão 'Accept cookies': {e}")
+
     # Passo 1: Localiza e clica no botão "Log in"
     wait = WebDriverWait(browser, 10)  # Aguarda até 10 segundos
     login_button = wait.until(EC.element_to_be_clickable((By.XPATH, "//div[text()='Log in']")))
