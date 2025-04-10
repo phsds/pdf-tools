@@ -140,23 +140,38 @@ def Pen_to_Print(browser):
                 print(f"Erro ao clicar no botão de conversão: {e}")
                 continue
 
-            # Extrai o texto convertido e salva em um arquivo Word
+            # Navega entre as páginas e salva o conteúdo em um arquivo Word
             try:
-                textarea = browser.find_element(By.CLASS_NAME, "scanline-cell-content")
-                text_content = textarea.get_attribute("value")  # Captura o texto do elemento
-                if not text_content.strip():
-                    print("Nenhum texto extraído. Pulando...")
-                    continue
-
-                # Salva o texto em um arquivo Word
+                # Cria o arquivo Word
                 doc = Document()
-                doc.add_paragraph(text_content)
+                page_counter = browser.find_element(By.CLASS_NAME, "page-counter").text
+                current_page, total_pages = map(int, page_counter.split(" ")[1].split("/"))
+
+                while current_page <= total_pages:
+                    # Extrai o texto da página atual
+                    textarea = browser.find_element(By.CLASS_NAME, "scanline-cell-content")
+                    text_content = textarea.get_attribute("value")
+                    if text_content.strip():
+                        doc.add_paragraph(text_content)  # Adiciona o texto da página
+                        doc.add_paragraph("")  # Adiciona um parágrafo vazio para separar as páginas
+
+                    # Avança para a próxima página, se houver
+                    if current_page < total_pages:
+                        next_button = browser.find_element(By.XPATH, "//div[@class='scanline-arrow']/img[@alt='next page']")
+                        browser.execute_script("arguments[0].click();", next_button)
+                        sleep(2)  # Aguarda o carregamento da próxima página
+                        page_counter = browser.find_element(By.CLASS_NAME, "page-counter").text
+                        current_page, total_pages = map(int, page_counter.split(" ")[1].split("/"))
+                    else:
+                        break
+
+                # Salva o arquivo Word
                 output_file = os.path.join("results", f"{os.path.basename(subfolder)}.docx")
-                os.makedirs("results", exist_ok=True)  # Garante que a pasta "results" exista
+                os.makedirs("results", exist_ok=True)
                 doc.save(output_file)
                 print(f"Texto extraído e salvo em '{output_file}'.")
             except Exception as e:
-                print(f"Erro ao extrair ou salvar o texto: {e}")
+                print(f"Erro ao navegar ou salvar o texto: {e}")
                 continue
 
         else:
@@ -196,25 +211,6 @@ def Pen_to_Print(browser):
                     print(f"Erro ao clicar no botão de conversão: {e}")
                     continue
 
-                # Extrai o texto convertido e salva em um arquivo Word
-                try:
-                    textarea = browser.find_element(By.CLASS_NAME, "scanline-cell-content")
-                    text_content = textarea.get_attribute("value")
-                    if not text_content.strip():
-                        print("Nenhum texto extraído. Pulando...")
-                        continue
-
-                    # Salva o texto em um arquivo Word
-                    doc = Document()
-                    doc.add_paragraph(text_content)
-                    output_file = os.path.join("results", f"{os.path.basename(subfolder)}_lote_{current_index // batch_size + 1}.docx")
-                    os.makedirs("results", exist_ok=True)
-                    doc.save(output_file)
-                    print(f"Texto extraído e salvo em '{output_file}'.")
-                except Exception as e:
-                    print(f"Erro ao extrair ou salvar o texto: {e}")
-                    continue
-
                 # Atualiza o índice para o próximo lote
                 current_index += batch_size
 
@@ -222,6 +218,5 @@ def Pen_to_Print(browser):
 
     print("Processamento concluído para todas as subpastas.")
     
-
 # Executa a função
 Pen_to_Print(activation())
