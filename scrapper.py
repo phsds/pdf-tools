@@ -9,6 +9,7 @@ from time import sleep
 import shutil
 import fitz
 import os
+import threading
 
 images_path = 'output-images/'
 
@@ -44,7 +45,7 @@ def convert_pdf_pages_to_images(input_folder, output_folder="output-images", zoo
     # Lists all PDF files in the input folder
     pdf_files = [os.path.join(input_folder, f) for f in os.listdir(input_folder) if f.endswith(".pdf")]
 
-    for pdf_file in pdf_files:
+    def process_pdf(pdf_file):
         # PDF name without extension
         pdf_name = os.path.splitext(os.path.basename(pdf_file))[0]
         # Creates a folder for the current PDF inside "output-images"
@@ -115,6 +116,17 @@ def convert_pdf_pages_to_images(input_folder, output_folder="output-images", zoo
                         print(f"Image '{image_file}' does not need to be split.")
             except Exception as e:
                 print(f"Error processing image '{image_file}': {e}")
+
+    # Create and start threads for each PDF file
+    threads = []
+    for pdf_file in pdf_files:
+        thread = threading.Thread(target=process_pdf, args=(pdf_file,))
+        threads.append(thread)
+        thread.start()
+
+    # Wait for all threads to complete
+    for thread in threads:
+        thread.join()
 
     print("Processing completed.")
         
@@ -275,4 +287,4 @@ def Pen_to_Print(browser):
     browser.quit()
 
 if __name__ == "__main__":
-  pass
+    pass

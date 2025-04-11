@@ -4,9 +4,8 @@ import tkinter as tk
 from tkinter import messagebox
 from tkinter.scrolledtext import ScrolledText
 import scrapper
-import time
 import threading
-
+import time
 class RedirectOutput:
     """Class to redirect stdout and stderr to the text widget."""
     def __init__(self, text_widget):
