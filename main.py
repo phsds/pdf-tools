@@ -147,7 +147,7 @@ def main_menu():
 
     btn_pdf_requests = tk.Button(root, text="PDF - Handwritten", command=pdf_requests, width=30, bg="#2e2e3e", fg="#ffffff", relief="flat", font=("Helvetica", 12))
     btn_pdf_requests.pack(pady=5)
-    btn_pdf_requests.bind("<Enter>", lambda e: on_hover(e, "Convert PDFs to JPG and upload to a website.", btn_pdf_requests))
+    btn_pdf_requests.bind("<Enter>", lambda e: on_hover(e, "Convert PDFs to PNGs and upload to a website.", btn_pdf_requests))
     btn_pdf_requests.bind("<Leave>", lambda e: on_leave(e, btn_pdf_requests))
 
     btn_finish = tk.Button(root, text="Finish Program", command=finish_program, width=30, bg="#e74c3c", fg="#ffffff", relief="flat", font=("Helvetica", 12))
