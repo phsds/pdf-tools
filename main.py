@@ -7,7 +7,6 @@ import scrapper
 import time
 import threading
 
-
 class RedirectOutput:
     """Class to redirect stdout and stderr to the text widget."""
     def __init__(self, text_widget):
@@ -29,59 +28,77 @@ def run_in_thread(func):
         thread.start()
     return wrapper
 
-
 @run_in_thread
 def text_extraction():
-    print('Starting text extraction...\n')
-    time.sleep(1)
-    print('Opening PDF file...\n')
-    time.sleep(1)
-    tools.extractText()
-    print('Text extraction completed.\n')
-    messagebox.showinfo("Success", "Text extraction completed!")
+    if not tools.check_pdfs():  # Verifica se tools.check_pdfs() retorna False
+        print("Directory /pdfs is empty, please put a PDF file in it.")
+        return  # Sai da função se o diretório estiver vazio
+    else:
+        print('Starting text extraction...\n')
+        time.sleep(1)
+        print('Opening PDF file...\n')
+        time.sleep(1)
+        tools.extractText()
+        print('Text extraction completed.\n')
+        messagebox.showinfo("Success", "Text extraction completed!")
 
 
 @run_in_thread
 def image_extraction():
-    print('Starting image extraction...\n')
-    time.sleep(1)
-    print('Processing PDF pages...\n')
-    time.sleep(1)
-    tools.extractImage()
-    print('Image extraction completed.\n')
-    messagebox.showinfo("Success", "Image extraction completed!")
+    if not tools.check_pdfs():  # Verifica se tools.check_pdfs() retorna False
+        print("Directory /pdfs is empty, please put a PDF file in it.")
+        return  # Sai da função se o diretório estiver vazio
+    else:
+        print('Starting image extraction...\n')
+        time.sleep(1)
+        print('Processing PDF pages...\n')
+        time.sleep(1)
+        tools.extractImage()
+        print('Image extraction completed.\n')
+        messagebox.showinfo("Success", "Image extraction completed!")
 
 
 @run_in_thread
 def pdf_merge():
-    print('Starting PDF merge...\n')
-    time.sleep(1)
-    print('Reading PDF files...\n')
-    time.sleep(1)
-    tools.merge_pdfs()
-    print('PDF merge completed.\n')
-    messagebox.showinfo("Success", "PDFs merged successfully!")
+    if not tools.check_pdfs():  # Verifica se tools.check_pdfs() retorna False
+        print("Directory /pdfs is empty, please put a PDF file in it.")
+        return  # Sai da função se o diretório estiver vazio
+    else:
+        print('Starting PDF merge...\n')
+        time.sleep(1)
+        print('Reading PDF files...\n')
+        time.sleep(1)
+        tools.merge_pdfs()
+        print('PDF merge completed.\n')
+        messagebox.showinfo("Success", "PDFs merged successfully!")
 
 
 @run_in_thread
 def pdf_split_combine():
-    print('Starting PDF split and combine...\n')
-    time.sleep(1)
-    print('Splitting selected pages...\n')
-    time.sleep(1)
-    tools.split_combine()
-    print('PDF split and combine completed.\n')
-    messagebox.showinfo("Success", "PDF split and combine completed!")
+    if not tools.check_pdfs():  # Verifica se tools.check_pdfs() retorna False
+        print("Directory /pdfs is empty, please put a PDF file in it.")
+        return  # Sai da função se o diretório estiver vazio
+    else:
+        print('Starting PDF split and combine...\n')
+        time.sleep(1)
+        print('Splitting selected pages...\n')
+        time.sleep(1)
+        tools.split_combine()
+        print('PDF split and combine completed.\n')
+        messagebox.showinfo("Success", "PDF split and combine completed!")
 
 
 @run_in_thread
 def pdf_requests():
-    print('Starting PDF to PNG conversion and uploading to the website...\n')
-    time.sleep(1)
-    scrapper.Pen_to_Print(scrapper.activation())
-    print('PDF processing completed.\n')
-    messagebox.showinfo("Success", "PDF processing completed!")
-
+    if not tools.check_pdfs():  # Verifica se tools.check_pdfs() retorna False
+        print("Directory /pdfs is empty, please put a PDF file in it.")
+        return  # Sai da função se o diretório estiver vazio
+    else:
+        print('Starting PDF to PNG conversion and uploading to the website...\n')
+        time.sleep(1)
+        scrapper.Pen_to_Print(scrapper.activation())
+        print('PDF processing completed.\n')
+        messagebox.showinfo("Success", "PDF processing completed!")
 
 def finish_program():
     print("Closing the program...\n")
@@ -152,8 +169,18 @@ def main_menu():
 
     btn_finish = tk.Button(root, text="Finish Program", command=finish_program, width=30, bg="#e74c3c", fg="#ffffff", relief="flat", font=("Helvetica", 12))
     btn_finish.pack(pady=20)
-    btn_finish.bind("<Enter>", lambda e: on_hover(e, "Close the application.", btn_finish))
-    btn_finish.bind("<Leave>", lambda e: on_leave(e, btn_finish))
+
+    # Add hover effect for the Finish Program button
+    def on_hover_finish(event):
+        btn_finish.config(bg="#ff6b6b")  # Lighter red on hover
+
+    def on_leave_finish(event):
+        btn_finish.config(bg="#e74c3c")  # Reset to original red
+
+    btn_finish.bind("<Enter>", on_hover_finish)
+    btn_finish.bind("<Leave>", on_leave_finish)
+    btn_finish.bind("<Enter>", lambda e: description_label.config(text="Close the application."))
+    btn_finish.bind("<Leave>", lambda e: description_label.config(text=""))
 
     # Text widget to display terminal output
     output_text = ScrolledText(root, wrap=tk.WORD, height=50, width=70, bg="#2e2e3e", fg="#ffffff", font=("Consolas", 10), relief="flat")
@@ -162,6 +189,19 @@ def main_menu():
     # Redirects stdout and stderr to the text widget
     sys.stdout = RedirectOutput(output_text)
     sys.stderr = RedirectOutput(output_text)
+
+    # Automatically call tools.check_path() after the GUI is initialized
+    def initialize_check_path():
+        print("Initializing check_path function...\n")
+        tools.check_paths()
+
+        # Clear the terminal after 2 seconds
+        def clear_terminal():
+            output_text.delete(1.0, tk.END)
+
+        root.after(1000, clear_terminal)  # Schedule terminal clearing after 2 seconds
+
+    root.after(100, initialize_check_path)  # Calls the function after 100ms
 
     # Starts the main GUI loop
     root.mainloop()

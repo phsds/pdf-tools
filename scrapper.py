@@ -6,15 +6,24 @@ from selenium.webdriver.support import expected_conditions as EC
 from PIL import Image
 from docx import Document
 from time import sleep
+import shutil
 import fitz
 import os
 
 images_path = 'output-images/'
 
+def delete_images():
+    # Deletes the "output-images" folder if it exists
+    if os.path.exists(images_path):
+        shutil.rmtree(images_path)
+        print("Deleted the 'output-images' folder.")
+    else:
+        print("The 'output-images' folder does not exist.")
+
 def check_path_images():
     if not os.path.exists(images_path):
         print('output-images directory not found, creating one and putting the images in it.')
-        convert_pdf_pages_to_images("teste-pdfs", "output-images")
+        convert_pdf_pages_to_images("pdfs", "output-images")
     else:
         print("Directory already created.")
         pass
@@ -261,6 +270,8 @@ def Pen_to_Print(browser):
         sleep(5)  # Waits for the homepage to load
 
     print("Processing completed for all subfolders.")
+    delete_images()  # Deletes the images after processing
+    # Closes the browser
     browser.quit()
 
 if __name__ == "__main__":
