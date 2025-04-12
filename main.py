@@ -1,59 +1,210 @@
 import sys
 import tools
-from art import tprint
+import tkinter as tk
+from tkinter import messagebox
+from tkinter.scrolledtext import ScrolledText
+import scrapper
+import threading
+import time
+class RedirectOutput:
+    """Class to redirect stdout and stderr to the text widget."""
+    def __init__(self, text_widget):
+        self.text_widget = text_widget
 
-tprint("-PDF-Tools", font="avatar")
+    def write(self, message):
+        self.text_widget.insert(tk.END, message)  # Inserts the message at the end of the widget
+        self.text_widget.see(tk.END)  # Automatically scrolls to the end
+        self.text_widget.update_idletasks()  # Immediately updates the GUI
 
-print("This is a terminal tool for reading, merging, splitting, and other functionalities with PDFs.")
+    def flush(self):
+        pass  # Required for compatibility with sys.stdout and sys.stderr
 
-def Main_Menu():
-    if tools.check_path() is True:
-        Checking()
+
+def run_in_thread(func):
+    """Decorator to run a function in a separate thread."""
+    def wrapper(*args, **kwargs):
+        thread = threading.Thread(target=func, args=args, kwargs=kwargs)
+        thread.start()
+    return wrapper
+
+@run_in_thread
+def text_extraction():
+    if not tools.check_pdfs():  # Verifica se tools.check_pdfs() retorna False
+        print("Directory /pdfs is empty, please put a PDF file in it.")
+        return  # Sai da função se o diretório estiver vazio
     else:
-        pass
-    while True:
-        option = int(input("""What option do you desire?
-(1) - Text Extraction
-(2) - Image Extraction
-(3) - Pdf Merge
-(4) - Pdf Split/Combine
-(5) - Converter Docx
-(6) - Finish the program
-
-Option : """))
-        options(option)
-        
-        condition = input("Deseja continuar:")
-        if condition == "y":
-            continue
-        else:
-            print("Encerrando programa")
-            break
-
-def Checking():
-    print('Checking if path exists and creating one if not.')
-    tools.check_path()
-    if tools.check_pdfs():
-        tools.check_pdfs()
-
-# Define what options você deseja
-def options(option):
-    if option == 1:
-        print('Inserting the extracted texts...\n')
+        print('Starting text extraction...\n')
+        time.sleep(1)
+        print('Opening PDF file...\n')
+        time.sleep(1)
         tools.extractText()
-    elif option == 2:
-        print('Extracting images from pdfs.')
-        tools.extractImage()
-    elif option == 3:
-        print('Combining the pdfs and saving "merged.pdf" at "results" directory.\n')
-        tools.merge_pdfs()
-    elif option == 4:
-        print('Crooping the selected range of pages and merging them at "results" directory with "splited_combined" name.\n')
-        tools.split_combine()
-    elif option == 6:
-        print("Finishing Program")
-        sys.exit(0)
-    else:
-        print('Please, select one of the options above.')
+        print('Text extraction completed.\n')
+        messagebox.showinfo("Success", "Text extraction completed!")
 
-Main_Menu()
+
+@run_in_thread
+def image_extraction():
+    if not tools.check_pdfs():  # Verifica se tools.check_pdfs() retorna False
+        print("Directory /pdfs is empty, please put a PDF file in it.")
+        return  # Sai da função se o diretório estiver vazio
+    else:
+        print('Starting image extraction...\n')
+        time.sleep(1)
+        print('Processing PDF pages...\n')
+        time.sleep(1)
+        tools.extractImage()
+        print('Image extraction completed.\n')
+        messagebox.showinfo("Success", "Image extraction completed!")
+
+
+@run_in_thread
+def pdf_merge():
+    if not tools.check_pdfs():  # Verifica se tools.check_pdfs() retorna False
+        print("Directory /pdfs is empty, please put a PDF file in it.")
+        return  # Sai da função se o diretório estiver vazio
+    else:
+        print('Starting PDF merge...\n')
+        time.sleep(1)
+        print('Reading PDF files...\n')
+        time.sleep(1)
+        tools.merge_pdfs()
+        print('PDF merge completed.\n')
+        messagebox.showinfo("Success", "PDFs merged successfully!")
+
+
+@run_in_thread
+def pdf_split_combine():
+    if not tools.check_pdfs():  # Verifica se tools.check_pdfs() retorna False
+        print("Directory /pdfs is empty, please put a PDF file in it.")
+        return  # Sai da função se o diretório estiver vazio
+    else:
+        print('Starting PDF split and combine...\n')
+        time.sleep(1)
+        print('Splitting selected pages...\n')
+        time.sleep(1)
+        tools.split_combine()
+        print('PDF split and combine completed.\n')
+        messagebox.showinfo("Success", "PDF split and combine completed!")
+
+
+@run_in_thread
+def pdf_requests():
+    if not tools.check_pdfs():  # Verifica se tools.check_pdfs() retorna False
+        print("Directory /pdfs is empty, please put a PDF file in it.")
+        return  # Sai da função se o diretório estiver vazio
+    else:
+        print('Starting PDF to PNG conversion and uploading to the website...\n')
+        time.sleep(1)
+        scrapper.Pen_to_Print(scrapper.activation())
+        print('PDF processing completed.\n')
+        messagebox.showinfo("Success", "PDF processing completed!")
+
+def finish_program():
+    print("Closing the program...\n")
+    sys.exit(0)
+
+
+def main_menu():
+    # Creates the main window
+    root = tk.Tk()
+    root.title("PDF Tools")
+
+    # Sets the window size
+    window_width = 600
+    window_height = 600
+
+    # Calculates the position to open the window on the right side and center vertically
+    screen_width = root.winfo_screenwidth()
+    screen_height = root.winfo_screenheight()
+    position_x = screen_width - window_width - 50
+    position_y = (screen_height // 2) - (window_height // 2)
+
+    # Sets the window geometry
+    root.geometry(f"{window_width}x{window_height}+{position_x}+{position_y}")
+    root.configure(bg="#1e1e2f")  # Dark blue-gray background
+
+    # Title
+    title_label = tk.Label(root, text="PDF Tools", font=("Helvetica", 20, "bold"), bg="#1e1e2f", fg="#ffffff")
+    title_label.pack(pady=20)
+
+    # Description label for hover effect
+    description_label = tk.Label(root, text="", font=("Helvetica", 12), bg="#1e1e2f", fg="#a9a9b3")
+    description_label.pack(pady=10)
+
+    # Function to update the description on hover
+    def on_hover(event, text, button):
+        description_label.config(text=text)
+        button.config(bg="#4a90e2", fg="#ffffff")  # Highlight with blue
+
+    def on_leave(event, button):
+        description_label.config(text="")
+        button.config(bg="#2e2e3e", fg="#ffffff")  # Reset to original colors
+
+    # Buttons for the options
+    btn_text_extraction = tk.Button(root, text="Text Extraction", command=text_extraction, width=30, bg="#2e2e3e", fg="#ffffff", relief="flat", font=("Helvetica", 12))
+    btn_text_extraction.pack(pady=5)
+    btn_text_extraction.bind("<Enter>", lambda e: on_hover(e, "Extract text from PDF files.", btn_text_extraction))
+    btn_text_extraction.bind("<Leave>", lambda e: on_leave(e, btn_text_extraction))
+
+    btn_image_extraction = tk.Button(root, text="Image Extraction", command=image_extraction, width=30, bg="#2e2e3e", fg="#ffffff", relief="flat", font=("Helvetica", 12))
+    btn_image_extraction.pack(pady=5)
+    btn_image_extraction.bind("<Enter>", lambda e: on_hover(e, "Extract images from PDF files.", btn_image_extraction))
+    btn_image_extraction.bind("<Leave>", lambda e: on_leave(e, btn_image_extraction))
+
+    btn_pdf_merge = tk.Button(root, text="PDF Merge", command=pdf_merge, width=30, bg="#2e2e3e", fg="#ffffff", relief="flat", font=("Helvetica", 12))
+    btn_pdf_merge.pack(pady=5)
+    btn_pdf_merge.bind("<Enter>", lambda e: on_hover(e, "Merge multiple PDF files into one.", btn_pdf_merge))
+    btn_pdf_merge.bind("<Leave>", lambda e: on_leave(e, btn_pdf_merge))
+
+    btn_pdf_split_combine = tk.Button(root, text="PDF Split/Combine", command=pdf_split_combine, width=30, bg="#2e2e3e", fg="#ffffff", relief="flat", font=("Helvetica", 12))
+    btn_pdf_split_combine.pack(pady=5)
+    btn_pdf_split_combine.bind("<Enter>", lambda e: on_hover(e, "Split and combine specific pages of PDFs.", btn_pdf_split_combine))
+    btn_pdf_split_combine.bind("<Leave>", lambda e: on_leave(e, btn_pdf_split_combine))
+
+    btn_pdf_requests = tk.Button(root, text="PDF - Handwritten", command=pdf_requests, width=30, bg="#2e2e3e", fg="#ffffff", relief="flat", font=("Helvetica", 12))
+    btn_pdf_requests.pack(pady=5)
+    btn_pdf_requests.bind("<Enter>", lambda e: on_hover(e, "Convert PDFs to PNGs and perform OCR on both digital and handwritten files.", btn_pdf_requests))
+    btn_pdf_requests.bind("<Leave>", lambda e: on_leave(e, btn_pdf_requests))
+
+    btn_finish = tk.Button(root, text="Finish Program", command=finish_program, width=30, bg="#e74c3c", fg="#ffffff", relief="flat", font=("Helvetica", 12))
+    btn_finish.pack(pady=20)
+
+    # Add hover effect for the Finish Program button
+    def on_hover_finish(event):
+        btn_finish.config(bg="#ff6b6b")  # Lighter red on hover
+
+    def on_leave_finish(event):
+        btn_finish.config(bg="#e74c3c")  # Reset to original red
+
+    btn_finish.bind("<Enter>", on_hover_finish)
+    btn_finish.bind("<Leave>", on_leave_finish)
+    btn_finish.bind("<Enter>", lambda e: description_label.config(text="Close the application."))
+    btn_finish.bind("<Leave>", lambda e: description_label.config(text=""))
+
+    # Text widget to display terminal output
+    output_text = ScrolledText(root, wrap=tk.WORD, height=50, width=70, bg="#2e2e3e", fg="#ffffff", font=("Consolas", 10), relief="flat")
+    output_text.pack(pady=10)
+
+    # Redirects stdout and stderr to the text widget
+    sys.stdout = RedirectOutput(output_text)
+    sys.stderr = RedirectOutput(output_text)
+
+    # Automatically call tools.check_path() after the GUI is initialized
+    def initialize_check_path():
+        print("Initializing check_path function...\n")
+        tools.check_paths()
+
+        # Clear the terminal after 2 seconds
+        def clear_terminal():
+            output_text.delete(1.0, tk.END)
+
+        root.after(1000, clear_terminal)  # Schedule terminal clearing after 2 seconds
+
+    root.after(100, initialize_check_path)  # Calls the function after 100ms
+
+    # Starts the main GUI loop
+    root.mainloop()
+
+
+if __name__ == "__main__":
+    main_menu()

@@ -15,29 +15,32 @@ merger = PdfMerger()
 #HINT : The directory where pdf(s) file(s) are putted is "pdfs".
 #Create "path" and results" directory where saved pdfs will go.
 def mkdir_pdfs():
-	if not os.path.exists(path):
-		os.mkdir(path)
+    if not os.path.exists(path):
+        os.mkdir(path)
 
 def mkdir_results():
-	if not os.path.exists(results):
-		os.mkdir(results)
-
+    if not os.path.exists(results):
+        os.mkdir(results)
+        
 #Check if the directory "path" have something in it, this function will substitute the bug of PyPDF2 where no FileNotFoundError errors are showed.
-def check_path():
+def check_paths():
     if not os.path.exists(path) or not os.path.exists(results):
-        print('Directory /pdfs or /results not found, creating one of each.')
+        print('Folders /pdfs or /results not found, creating one of each.')
         mkdir_pdfs()
         mkdir_results()
+        sleep(1)
+        print('Folders created!')
     else:
-        print("Pastas já criadas.")
+        print("Folders already created.")
         pass
 
 def check_pdfs():
+    # Verifica se o diretório está vazio
     if len(os.listdir(path)) < 1:
-        print('PDF(s) file(s) not found, please put them in "pdfs" directory.')
-        raise SystemExit(0)
-
-#Extract text from pdf files in "pdfs" directory
+        return False  # Retorna False se não houver arquivos no diretório
+    return True  # Retorna True se houver arquivos no diretório
+    
+    #Extract text from pdf files in "pdfs" directory
 def extractText():
     for archive in os.listdir(path):
         pdf = os.path.join(path, archive)
@@ -65,7 +68,7 @@ def extractImage():
                         except:
                             os.remove(img_file_obj.name)
     except Exception as err:
-        print("houve algum erro com a formatação do pdf que não deu para extrair todas as imagens.")
+        print("There was an error with the PDF formatting, and it was not possible to extract all images.")
         print(f"\n {err}")
     print('\nAll done!')
 
@@ -89,4 +92,4 @@ def split_combine():
 #For debugging porpouses. Just remove the hash downside if you want execute this file without main.
 
 if __name__ == "__main__":
-  pass
+    pass
