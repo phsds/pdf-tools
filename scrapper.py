@@ -29,21 +29,22 @@ def check_path_images():
         print("Directory already created.")
         pass
 
+import tools
+# ...código existente...
+
 def convert_pdf_pages_to_images(input_folder, output_folder="output-images", zoom=4.0, image_format="png"):
     """
     Converts PDF pages into high-quality images and checks dimensions to split wide images.
-    
-    Args:
-        input_folder (str): Folder containing the input PDFs.
-        output_folder (str): Folder where the images will be saved.
-        zoom (float): Zoom factor to increase quality (default: 4.0).
-        image_format (str): Output image format (default: "png").
     """
-    # Creates the output folder
+    # Junta todos os PDFs em um único arquivo antes de processar as imagens
+    tools.merge_pdfs()
+    merged_pdf_path = os.path.join("./results/", "merged.pdf")
+
+    # Cria a pasta de saída
     os.makedirs(output_folder, exist_ok=True)
 
-    # Lists all PDF files in the input folder
-    pdf_files = [os.path.join(input_folder, f) for f in os.listdir(input_folder) if f.endswith(".pdf")]
+    # Processa apenas o PDF mesclado
+    pdf_files = [merged_pdf_path]
 
     def process_pdf(pdf_file):
         # PDF name without extension
@@ -117,7 +118,7 @@ def convert_pdf_pages_to_images(input_folder, output_folder="output-images", zoo
             except Exception as e:
                 print(f"Error processing image '{image_file}': {e}")
 
-    # Create and start threads for each PDF file
+    # Create and start threads for the merged PDF file
     threads = []
     for pdf_file in pdf_files:
         thread = threading.Thread(target=process_pdf, args=(pdf_file,))
@@ -229,8 +230,26 @@ def Pen_to_Print(browser):
                 print(f"Error clicking the convert button: {e}")
                 continue
 
-            # Extracts the text from the pages and saves it in the Word file
+           # Extracts the text from the pages and saves it in the Word file
             try:
+                # REGRA PARA SUBPASTA COM APENAS UMA IMAGEM/PÁGINA
+                if len(batch_files) == 1:
+                    try:
+                        textarea = WebDriverWait(browser, 10).until(
+                            EC.presence_of_element_located((By.CLASS_NAME, "scanline-cell-content"))
+                        )
+                        text_content = textarea.get_attribute("value")
+                        if text_content.strip():
+                            doc.add_paragraph(text_content)
+                            doc.add_paragraph("")  # Adds an empty paragraph to separate pages
+                        doc.save(output_file)
+                        print(f"Text extracted and saved in '{output_file}'.")
+                    except Exception as e:
+                        print(f"Error scraping single-page text: {e}")
+                    # Vai para a próxima iteração do while/for, não executa o restante do bloco
+                    continue
+
+                # REGRA ORIGINAL PARA MAIS DE UMA PÁGINA
                 page_counter = browser.find_element(By.CLASS_NAME, "page-counter").text
                 current_page, total_pages = map(int, page_counter.split(" ")[1].split("/"))
 
