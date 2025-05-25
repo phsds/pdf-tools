@@ -1,4 +1,5 @@
 import os
+import re
 from shutil import move
 from PyPDF2 import PdfReader, PdfWriter, PdfMerger
 from time import sleep
@@ -72,12 +73,24 @@ def extractImage():
         print(f"\n {err}")
     print('\nAll done!')
 
+#Natural sorting function to sort the pdf files in the directory
+def natural_key(text):
+    # Divide o texto em partes numéricas e não numéricas para ordenação natural
+    return [int(s) if s.isdigit() else s.lower() for s in re.split(r'(\d+)', text)]
+
 #Merge pdf files in "pdfs" directory
 def merge_pdfs():
-    for archive in os.listdir(path):
+    # Lista e ordena os arquivos PDF pelo nome usando ordenação natural
+    pdf_files = sorted(
+        [f for f in os.listdir(path) if f.lower().endswith('.pdf')],
+        key=natural_key
+    )
+    merger = PdfMerger()  # Garante que o merger está limpo a cada chamada
+    for archive in pdf_files:
         pdf = os.path.join(path, archive)
         merger.append(pdf)
     merger.write(f'{results}{output_merger}')
+    merger.close()
     print('\nAll done!')
 
 #Especify a range of pdfs pages that will be splitted and merged into a singlefile.
