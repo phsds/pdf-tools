@@ -17,7 +17,7 @@ def delete_images():
     # Deletes the "output-images" folder if it exists
     if os.path.exists(images_path):
         shutil.rmtree(images_path)
-        print("Deleted the 'output-images' folder.")
+        print("Deleted the 'output-images' folder, wait a moment...")
     else:
         print("The 'output-images' folder does not exist.")
 
@@ -130,6 +130,7 @@ def convert_pdf_pages_to_images(input_folder, output_folder="output-images", zoo
         thread.join()
 
     print("Processing completed.")
+    print("Starting the Pen-to-Print scrapper, wait a moment...")
         
 def activation():
     check_path_images()
