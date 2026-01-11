@@ -35,3 +35,9 @@ After processing the **PDF - Handwritten** option, the PDFs are converted into t
 - You need to create an account on the Pen-to-Print website.
 - A file named "credentials.dpapi" will be generated and should be placed in the same folder as the executable if you want your email and password to be saved.
 - To use a different account, simply delete the "credentials.dpapi" file.
+
+## Licença
+
+Este software é distribuído sob a licença **CC-BY-NC 4.0**.  
+Uso comercial é **proibido**.  
+Mais detalhes em [Creative Commons BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/).
