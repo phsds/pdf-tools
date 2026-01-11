@@ -6,6 +6,7 @@ from tkinter.scrolledtext import ScrolledText
 import scrapper
 import threading
 import time
+import queue
 
 class RedirectOutput:
     """Class to redirect stdout and stderr to the text widget."""
@@ -157,7 +158,7 @@ def main_menu():
     btn_pdf_merge.bind("<Enter>", lambda e: on_hover(e, "Merge multiple PDF files into one.", btn_pdf_merge))
     btn_pdf_merge.bind("<Leave>", lambda e: on_leave(e, btn_pdf_merge))
 
-    btn_pdf_split_combine = tk.Button(root, text="PDF Split/Combine", command=pdf_split_combine, width=30, bg="#2e2e3e", fg="#ffffff", relief="flat", font=("Helvetica", 12))
+    btn_pdf_split_combine = tk.Button(root, text="PDF Split", command=pdf_split_combine, width=30, bg="#2e2e3e", fg="#ffffff", relief="flat", font=("Helvetica", 12))
     btn_pdf_split_combine.pack(pady=5)
     btn_pdf_split_combine.bind("<Enter>", lambda e: on_hover(e, "Split and combine specific pages of PDFs.", btn_pdf_split_combine))
     btn_pdf_split_combine.bind("<Leave>", lambda e: on_leave(e, btn_pdf_split_combine))
@@ -185,6 +186,75 @@ def main_menu():
     # Text widget to display terminal output
     output_text = ScrolledText(root, wrap=tk.WORD, height=50, width=70, bg="#2e2e3e", fg="#ffffff", font=("Consolas", 10), relief="flat")
     output_text.pack(pady=10)
+
+    # Make the log widget interactive: allow typing and connect to sys.stdin
+    class GuiStdin:
+        def __init__(self, text_widget):
+            self.text_widget = text_widget
+            self.queue = queue.Queue()
+            self.last_prompt_index = None
+
+        def _show_prompt(self):
+            # Insert a prompt marker where user can type
+            try:
+                # Ensure widget ends with a newline before inserting prompt
+                end_index = self.text_widget.index('end-1c')
+                last_char = self.text_widget.get(f"{end_index}", f"{end_index}")
+            except Exception:
+                last_char = "\n"
+            if not last_char.endswith("\n"):
+                self.text_widget.insert('end', "\n")
+            self.text_widget.insert('end', ">>> ")
+            self.text_widget.see('end')
+            # store the index where user input starts
+            self.last_prompt_index = self.text_widget.index('end-1c')
+            self.text_widget.focus_set()
+
+        def readline(self, *args, **kwargs):
+            # Schedule prompt insertion in the GUI thread
+            try:
+                self.text_widget.after(0, self._show_prompt)
+            except Exception:
+                pass
+            # Wait for user input from the queue
+            line = self.queue.get()  # blocks until GUI puts input
+            return line + "\n"
+
+        def read(self, *args, **kwargs):
+            return self.readline()
+
+    gui_stdin = GuiStdin(output_text)
+
+    def _on_enter(event):
+        # Called when user presses Enter inside the text widget
+        try:
+            if gui_stdin.last_prompt_index:
+                start = gui_stdin.last_prompt_index
+                # Get user-typed content from prompt start to end
+                user_text = output_text.get(start, 'end-1c')
+                # Clean trailing newline if present
+                user_text = user_text.rstrip('\n')
+                gui_stdin.queue.put(user_text)
+                # Echo newline to the widget
+                output_text.insert('end', '\n')
+                gui_stdin.last_prompt_index = None
+                return 'break'  # prevent default newline insertion
+            else:
+                # Fallback: send current line
+                line = output_text.get('insert linestart', 'insert lineend')
+                gui_stdin.queue.put(line)
+                output_text.insert('end', '\n')
+                return 'break'
+        except Exception as e:
+            print(f"Error handling input: {e}")
+            return None
+
+    # Allow typing and bind Enter
+    output_text.config(state='normal')
+    output_text.bind('<Return>', _on_enter)
+    # Replace sys.stdin with our GUI stdin
+    import sys as _sys
+    _sys.stdin = gui_stdin
 
     # Redirects stdout and stderr to the text widget
     sys.stdout = RedirectOutput(output_text)

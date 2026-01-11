@@ -95,11 +95,58 @@ def merge_pdfs():
 
 #Especify a range of pdfs pages that will be splitted and merged into a singlefile.
 def split_combine():
-    for archive in os.listdir(path):
-        pdf = os.path.join(path, archive)
-        reader = PdfReader(pdf ,'rb')
-        writer.add_page(reader.pages[0])
-        writer.write(f'{results}{output_split}')
+    # Pergunta ao usuário quantas páginas por arquivo deseja
+    while True:
+        try:
+            pages_per_file = int(input("Quantas páginas por arquivo? "))
+            if pages_per_file <= 0:
+                raise ValueError()
+            break
+        except ValueError:
+            print("Por favor, insira um número inteiro maior que 0.")
+
+    # Garante que a pasta de resultados exista
+    if not os.path.exists(results):
+        os.makedirs(results, exist_ok=True)
+
+    # Lista e ordena os arquivos PDF no diretório `path`
+    pdf_files = sorted([f for f in os.listdir(path) if f.lower().endswith('.pdf')], key=natural_key)
+
+    for archive in pdf_files:
+        pdf_path = os.path.join(path, archive)
+        reader = PdfReader(pdf_path)
+        total_pages = len(reader.pages)
+        base_name = os.path.splitext(archive)[0]
+
+        start = 0
+        while start < total_pages:
+            end = start + pages_per_file
+            # Se end ultrapassar total_pages, ajusta para o restante
+            if end >= total_pages:
+                end = total_pages
+
+            writer = PdfWriter()
+            for p in range(start, end):
+                writer.add_page(reader.pages[p])
+
+            # Monta o nome conforme pedido: "nome do pdf (página ou páginas)"
+            if start + 1 == end:
+                page_label = f"{start+1}"
+            else:
+                page_label = f"{start+1}-{end}"
+
+            output_name = f"{base_name} ({page_label}).pdf"
+            output_path = os.path.join(results, output_name)
+
+            with open(output_path, 'wb') as out_f:
+                writer.write(out_f)
+
+            print(f"Salvo: {output_path}")
+
+            start = end
+
+        print(f"{archive} processado ({total_pages} páginas).")
+
     print('\nAll done!')
 
 #For debugging porpouses. Just remove the hash downside if you want execute this file without main.
