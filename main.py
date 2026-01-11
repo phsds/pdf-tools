@@ -8,6 +8,7 @@ import threading
 import time
 import queue
 
+#command for conversion to executable: pyinstaller --onefile --windowed --icon=Logo.ico main.py 
 class RedirectOutput:
     """Class to redirect stdout and stderr to the text widget."""
     def __init__(self, text_widget):
