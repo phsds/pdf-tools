@@ -4,7 +4,7 @@ from shutil import move
 from PyPDF2 import PdfReader, PdfWriter, PdfMerger
 from time import sleep
 
-#hi, my friend
+# hi, my friend
 
 path = 'pdfs/'
 results = 'results/'
@@ -13,8 +13,8 @@ output_split = 'splited_combined.pdf'
 writer = PdfWriter()
 merger = PdfMerger()
 
-#HINT : The directory where pdf(s) file(s) are putted is "pdfs".
-#Create "path" and results" directory where saved pdfs will go.
+# HINT: The directory where PDF files are placed is "pdfs".
+# Create the `path` and `results` directories where saved PDFs will go.
 def mkdir_pdfs():
     if not os.path.exists(path):
         os.mkdir(path)
@@ -36,12 +36,13 @@ def check_paths():
         pass
 
 def check_pdfs():
-    # Verifica se o diretório está vazio
+    # Checks if the directory is empty
     if len(os.listdir(path)) < 1:
-        return False  # Retorna False se não houver arquivos no diretório
-    return True  # Retorna True se houver arquivos no diretório
-    
-    #Extract text from pdf files in "pdfs" directory
+        return False  # Returns False if there are no files in the directory
+    return True  # Returns True if there are files in the directory
+
+
+    # Extract text from PDF files in the "pdfs" directory
 def extractText():
     for archive in os.listdir(path):
         pdf = os.path.join(path, archive)
@@ -75,17 +76,17 @@ def extractImage():
 
 #Natural sorting function to sort the pdf files in the directory
 def natural_key(text):
-    # Divide o texto em partes numéricas e não numéricas para ordenação natural
+    # Split the text into numeric and non-numeric parts for natural sorting
     return [int(s) if s.isdigit() else s.lower() for s in re.split(r'(\d+)', text)]
 
 #Merge pdf files in "pdfs" directory
 def merge_pdfs():
-    # Lista e ordena os arquivos PDF pelo nome usando ordenação natural
+    # List and sort PDF files by name using natural sorting
     pdf_files = sorted(
         [f for f in os.listdir(path) if f.lower().endswith('.pdf')],
         key=natural_key
     )
-    merger = PdfMerger()  # Garante que o merger está limpo a cada chamada
+    merger = PdfMerger()  # Ensure a fresh merger on each call
     for archive in pdf_files:
         pdf = os.path.join(path, archive)
         merger.append(pdf)
@@ -95,21 +96,21 @@ def merge_pdfs():
 
 #Especify a range of pdfs pages that will be splitted and merged into a singlefile.
 def split_combine():
-    # Pergunta ao usuário quantas páginas por arquivo deseja
+    # Ask the user how many pages per file they want
     while True:
         try:
-            pages_per_file = int(input("Quantas páginas por arquivo? "))
+            pages_per_file = int(input("How many pages per file? "))
             if pages_per_file <= 0:
                 raise ValueError()
             break
         except ValueError:
-            print("Por favor, insira um número inteiro maior que 0.")
+            print("Please enter an integer greater than 0.")
 
-    # Garante que a pasta de resultados exista
+    # Ensure that the results folder exists
     if not os.path.exists(results):
         os.makedirs(results, exist_ok=True)
 
-    # Lista e ordena os arquivos PDF no diretório `path`
+    # Lists and sorts the PDF files in the `path` directory
     pdf_files = sorted([f for f in os.listdir(path) if f.lower().endswith('.pdf')], key=natural_key)
 
     for archive in pdf_files:
@@ -121,7 +122,7 @@ def split_combine():
         start = 0
         while start < total_pages:
             end = start + pages_per_file
-            # Se end ultrapassar total_pages, ajusta para o restante
+            # If end exceeds total_pages, adjust to the remainder
             if end >= total_pages:
                 end = total_pages
 
@@ -129,7 +130,7 @@ def split_combine():
             for p in range(start, end):
                 writer.add_page(reader.pages[p])
 
-            # Monta o nome conforme pedido: "nome do pdf (página ou páginas)"
+            # Mount the name as requested: "pdf name (page or pages)"
             if start + 1 == end:
                 page_label = f"{start+1}"
             else:
@@ -141,15 +142,15 @@ def split_combine():
             with open(output_path, 'wb') as out_f:
                 writer.write(out_f)
 
-            print(f"Salvo: {output_path}")
+            print(f"Saved: {output_path}")
 
             start = end
 
-        print(f"{archive} processado ({total_pages} páginas).")
+        print(f"{archive} processed ({total_pages} pages).")
 
     print('\nAll done!')
 
-#For debugging porpouses. Just remove the hash downside if you want execute this file without main.
+# For debugging purposes. Remove the hash below if you want to execute this file directly.
 
 if __name__ == "__main__":
     pass
