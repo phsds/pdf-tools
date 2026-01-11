@@ -166,7 +166,7 @@ def main_menu():
 
     btn_pdf_requests = tk.Button(root, text="PDF - Handwritten", command=pdf_requests, width=30, bg="#2e2e3e", fg="#ffffff", relief="flat", font=("Helvetica", 12))
     btn_pdf_requests.pack(pady=5)
-    btn_pdf_requests.bind("<Enter>", lambda e: on_hover(e, "Convert PDFs to PNGs and perform OCR on both digital and handwritten files.", btn_pdf_requests))
+    btn_pdf_requests.bind("<Enter>", lambda e: on_hover(e, "Use your account to automatize Pen-To-Print website's OCR process", btn_pdf_requests))
     btn_pdf_requests.bind("<Leave>", lambda e: on_leave(e, btn_pdf_requests))
 
     btn_finish = tk.Button(root, text="Finish Program", command=finish_program, width=30, bg="#e74c3c", fg="#ffffff", relief="flat", font=("Helvetica", 12))
@@ -291,7 +291,7 @@ def main_menu():
                     top.attributes("-topmost", True)
                     top.lift()
                     # message in red, larger font
-                    msg = tk.Label(top, text="Digite o e-mail e senha no terminal do programa e não no navegador.", fg="red", font=("Helvetica", 14, "bold"), wraplength=480, justify='center')
+                    msg = tk.Label(top, text="Enter your email and password in the PROGRAM'S TERMINAL, not in the browser.", fg="red", font=("Helvetica", 14, "bold"), wraplength=480, justify='center')
                     msg.pack(fill='both', expand=True, padx=20, pady=12)
                     btn = tk.Button(top, text="OK", command=lambda: (top.attributes('-topmost', False), top.destroy()))
                     btn.pack(pady=(0, 12))

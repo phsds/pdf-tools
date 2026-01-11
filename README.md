@@ -2,30 +2,36 @@
 
 **PDF-TOOLS** is a GUI tool for using PDFs, with functions included such as reading, mixing, conversion, etc ...
 
-Quando o .exe for executado, duas pastas serão criadas na localização do executável. Sendo essas:
+When the .exe is run, two folders will be created in the executable's location. They are:
 
-- **pdfs:** pasta em que se coloca os pdfs
-- **results:** resultado convertido em docx após processamento
+- **pdfs:** folder where you place the PDF files
+- **results:** converted DOCX results after processing
 
 ## Commands
 
-Quando a interfaçe for executada, aparecerá essas opções para selecionar:
+When the interface runs, the following options will be available:
 
 - Text Extraction: Extract text from PDF files
 - Image Extraction: Extract images from PDF files
-- PDF Merge: Merge multiple PDF files into one
-- PDF Split/Combine: Split and combine specific pages of PDFs
-- PDF - Handwritten: Use a temp account to automatize Pen-To-Print website's OCR process
+- PDF - Merge: Merge multiple PDF files into one
+- PDF - Split: Split specific pages of PDFs
+- PDF - Handwritten: Use your account to automatize Pen-To-Print website's OCR process
 
-Principais APIs são:
+Main APIs used:
 
-- PYPDF2 - PyPDF2==3.0.1
-- Pillow - pillow==11.1.0
-- Docx - python-docx==1.1.2
-- Selenium - selenium==4.30.0
+- PyPDF2
+- Pillow
+- python-docx
+- Selenium
+- Others listed in `requirements.txt`
 
-## Funcionamento
+## How it works
 
-No geral, com excessão da última opção, todas as funcões são executadas diretamente pela GUI sem intervenção do navegador.
+When using **PDF - Merge**, the application will ask in its terminal how many pages should be grouped/separated.
 
-Após o processamento da opção **PDF - Handwritten**, os pdfs serão convertidos em imagens momentâneas que serão processadas no site e depois eliminadas.
+In general, except for the last option, all features run directly from the GUI without browser interaction.
+
+After processing the **PDF - Handwritten** option, the PDFs are converted into temporary images that are uploaded to the website for processing and then removed:
+- You need to create an account on the Pen-to-Print website.
+- A file named "credentials.dpapi" will be generated and should be placed in the same folder as the executable if you want your email and password to be saved.
+- To use a different account, simply delete the "credentials.dpapi" file.
