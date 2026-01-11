@@ -10,6 +10,7 @@ Functions:
 Note: do not commit the `credentials.dpapi` or `credentials.enc` files.
 """
 import os
+import sys
 
 try:
     from ctypes import windll, create_string_buffer, byref, c_void_p, c_wchar_p
@@ -53,7 +54,11 @@ except Exception:
 
 def get_credentials():
     """Return (email, password) if a protected credentials file exists, otherwise raise RuntimeError."""
-    base = os.path.dirname(__file__)
+    # Use the executable directory when frozen (PyInstaller), otherwise use the script directory
+    if getattr(sys, "frozen", False):
+        base = os.path.dirname(sys.executable)
+    else:
+        base = os.path.dirname(os.path.abspath(__file__))
 
     # DPAPI file
     if _HAS_DPAPI:
@@ -85,7 +90,11 @@ def get_credentials():
 
 def save_credentials(email: str, password: str) -> str:
     """Save protected credentials. Return the path of the saved file."""
-    base = os.path.dirname(__file__)
+    # Use the executable directory when frozen (PyInstaller), otherwise use the script directory
+    if getattr(sys, "frozen", False):
+        base = os.path.dirname(sys.executable)
+    else:
+        base = os.path.dirname(os.path.abspath(__file__))
     data = (email + "\n" + password).encode()
 
     if _HAS_DPAPI:
