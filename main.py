@@ -6,7 +6,9 @@ from tkinter.scrolledtext import ScrolledText
 import scrapper
 import threading
 import time
+import queue
 
+#command for conversion to executable: pyinstaller --onefile --windowed --icon=Logo.ico main.py 
 class RedirectOutput:
     """Class to redirect stdout and stderr to the text widget."""
     def __init__(self, text_widget):
@@ -30,9 +32,9 @@ def run_in_thread(func):
 
 @run_in_thread
 def text_extraction():
-    if not tools.check_pdfs():  # Verifica se tools.check_pdfs() retorna False
+    if not tools.check_pdfs():  # Check if tools.check_pdfs() returns False
         print("Directory /pdfs is empty, please put a PDF file in it.")
-        return  # Sai da função se o diretório estiver vazio
+        return  # Exit the function if the directory is empty
     else:
         print('Starting text extraction...\n')
         time.sleep(1)
@@ -45,9 +47,9 @@ def text_extraction():
 
 @run_in_thread
 def image_extraction():
-    if not tools.check_pdfs():  # Verifica se tools.check_pdfs() retorna False
+    if not tools.check_pdfs():  # Check if tools.check_pdfs() returns False
         print("Directory /pdfs is empty, please put a PDF file in it.")
-        return  # Sai da função se o diretório estiver vazio
+        return  # Exit the function if the directory is empty
     else:
         print('Starting image extraction...\n')
         time.sleep(1)
@@ -60,9 +62,9 @@ def image_extraction():
 
 @run_in_thread
 def pdf_merge():
-    if not tools.check_pdfs():  # Verifica se tools.check_pdfs() retorna False
+    if not tools.check_pdfs():  # Check if tools.check_pdfs() returns False
         print("Directory /pdfs is empty, please put a PDF file in it.")
-        return  # Sai da função se o diretório estiver vazio
+        return  # Exit the function if the directory is empty
     else:
         print('Starting PDF merge...\n')
         time.sleep(1)
@@ -75,9 +77,9 @@ def pdf_merge():
 
 @run_in_thread
 def pdf_split_combine():
-    if not tools.check_pdfs():  # Verifica se tools.check_pdfs() retorna False
+    if not tools.check_pdfs():  # Check if tools.check_pdfs() returns False
         print("Directory /pdfs is empty, please put a PDF file in it.")
-        return  # Sai da função se o diretório estiver vazio
+        return  # Exit the function if the directory is empty
     else:
         print('Starting PDF split and combine...\n')
         time.sleep(1)
@@ -90,15 +92,16 @@ def pdf_split_combine():
 
 @run_in_thread
 def pdf_requests():
-    if not tools.check_pdfs():  # Verifica se tools.check_pdfs() retorna False
+    if not tools.check_pdfs():  # Check if tools.check_pdfs() returns False
         print("Directory /pdfs is empty, please put a PDF file in it.")
-        return  # Sai da função se o diretório estiver vazio
+        return  # Exit the function if the directory is empty
     else:
         print('Starting PDF to PNG conversion and uploading to the website...\n')
         time.sleep(1)
         scrapper.Pen_to_Print(scrapper.activation())
         print('PDF processing completed.\n')
         messagebox.showinfo("Success", "PDF processing completed!")
+        
 
 def finish_program():
     print("Closing the program...\n")
@@ -152,19 +155,19 @@ def main_menu():
     btn_image_extraction.bind("<Enter>", lambda e: on_hover(e, "Extract images from PDF files.", btn_image_extraction))
     btn_image_extraction.bind("<Leave>", lambda e: on_leave(e, btn_image_extraction))
 
-    btn_pdf_merge = tk.Button(root, text="PDF Merge", command=pdf_merge, width=30, bg="#2e2e3e", fg="#ffffff", relief="flat", font=("Helvetica", 12))
+    btn_pdf_merge = tk.Button(root, text="PDF - Merge", command=pdf_merge, width=30, bg="#2e2e3e", fg="#ffffff", relief="flat", font=("Helvetica", 12))
     btn_pdf_merge.pack(pady=5)
     btn_pdf_merge.bind("<Enter>", lambda e: on_hover(e, "Merge multiple PDF files into one.", btn_pdf_merge))
     btn_pdf_merge.bind("<Leave>", lambda e: on_leave(e, btn_pdf_merge))
 
-    btn_pdf_split_combine = tk.Button(root, text="PDF Split/Combine", command=pdf_split_combine, width=30, bg="#2e2e3e", fg="#ffffff", relief="flat", font=("Helvetica", 12))
+    btn_pdf_split_combine = tk.Button(root, text="PDF - Split", command=pdf_split_combine, width=30, bg="#2e2e3e", fg="#ffffff", relief="flat", font=("Helvetica", 12))
     btn_pdf_split_combine.pack(pady=5)
-    btn_pdf_split_combine.bind("<Enter>", lambda e: on_hover(e, "Split and combine specific pages of PDFs.", btn_pdf_split_combine))
+    btn_pdf_split_combine.bind("<Enter>", lambda e: on_hover(e, "Split specific pages of PDFs.", btn_pdf_split_combine))
     btn_pdf_split_combine.bind("<Leave>", lambda e: on_leave(e, btn_pdf_split_combine))
 
     btn_pdf_requests = tk.Button(root, text="PDF - Handwritten", command=pdf_requests, width=30, bg="#2e2e3e", fg="#ffffff", relief="flat", font=("Helvetica", 12))
     btn_pdf_requests.pack(pady=5)
-    btn_pdf_requests.bind("<Enter>", lambda e: on_hover(e, "Convert PDFs to PNGs and perform OCR on both digital and handwritten files.", btn_pdf_requests))
+    btn_pdf_requests.bind("<Enter>", lambda e: on_hover(e, "Use your account to automatize Pen-To-Print website's OCR process", btn_pdf_requests))
     btn_pdf_requests.bind("<Leave>", lambda e: on_leave(e, btn_pdf_requests))
 
     btn_finish = tk.Button(root, text="Finish Program", command=finish_program, width=30, bg="#e74c3c", fg="#ffffff", relief="flat", font=("Helvetica", 12))
@@ -186,6 +189,75 @@ def main_menu():
     output_text = ScrolledText(root, wrap=tk.WORD, height=50, width=70, bg="#2e2e3e", fg="#ffffff", font=("Consolas", 10), relief="flat")
     output_text.pack(pady=10)
 
+    # Make the log widget interactive: allow typing and connect to sys.stdin
+    class GuiStdin:
+        def __init__(self, text_widget):
+            self.text_widget = text_widget
+            self.queue = queue.Queue()
+            self.last_prompt_index = None
+
+        def _show_prompt(self):
+            # Insert a prompt marker where user can type
+            try:
+                # Ensure widget ends with a newline before inserting prompt
+                end_index = self.text_widget.index('end-1c')
+                last_char = self.text_widget.get(f"{end_index}", f"{end_index}")
+            except Exception:
+                last_char = "\n"
+            if not last_char.endswith("\n"):
+                self.text_widget.insert('end', "\n")
+            self.text_widget.insert('end', ">>> ")
+            self.text_widget.see('end')
+            # store the index where user input starts
+            self.last_prompt_index = self.text_widget.index('end-1c')
+            self.text_widget.focus_set()
+
+        def readline(self, *args, **kwargs):
+            # Schedule prompt insertion in the GUI thread
+            try:
+                self.text_widget.after(0, self._show_prompt)
+            except Exception:
+                pass
+            # Wait for user input from the queue
+            line = self.queue.get()  # blocks until GUI puts input
+            return line + "\n"
+
+        def read(self, *args, **kwargs):
+            return self.readline()
+
+    gui_stdin = GuiStdin(output_text)
+
+    def _on_enter(event):
+        # Called when user presses Enter inside the text widget
+        try:
+            if gui_stdin.last_prompt_index:
+                start = gui_stdin.last_prompt_index
+                # Get user-typed content from prompt start to end
+                user_text = output_text.get(start, 'end-1c')
+                # Clean trailing newline if present
+                user_text = user_text.rstrip('\n')
+                gui_stdin.queue.put(user_text)
+                # Echo newline to the widget
+                output_text.insert('end', '\n')
+                gui_stdin.last_prompt_index = None
+                return 'break'  # prevent default newline insertion
+            else:
+                # Fallback: send current line
+                line = output_text.get('insert linestart', 'insert lineend')
+                gui_stdin.queue.put(line)
+                output_text.insert('end', '\n')
+                return 'break'
+        except Exception as e:
+            print(f"Error handling input: {e}")
+            return None
+
+    # Allow typing and bind Enter
+    output_text.config(state='normal')
+    output_text.bind('<Return>', _on_enter)
+    # Replace sys.stdin with our GUI stdin
+    import sys as _sys
+    _sys.stdin = gui_stdin
+
     # Redirects stdout and stderr to the text widget
     sys.stdout = RedirectOutput(output_text)
     sys.stderr = RedirectOutput(output_text)
@@ -204,6 +276,38 @@ def main_menu():
     root.after(100, initialize_check_path)  # Calls the function after 100ms
 
     # Starts the main GUI loop
+    # Register scrapper popup callback so scrapper can request GUI popups
+    try:
+        def _show_attention_popup():
+            def _create():
+                    top = tk.Toplevel(root)
+                    top.title("ATENÇÃO!")
+                    # Increase size and center on screen; make topmost so it's between GUI and browser
+                    popup_w, popup_h = 520, 160
+                    screen_w = root.winfo_screenwidth()
+                    screen_h = root.winfo_screenheight()
+                    pos_x = (screen_w - popup_w) // 2
+                    pos_y = (screen_h - popup_h) // 2
+                    top.geometry(f"{popup_w}x{popup_h}+{pos_x}+{pos_y}")
+                    top.attributes("-topmost", True)
+                    top.lift()
+                    # message in red, larger font
+                    msg = tk.Label(top, text="Enter your email and password in the PROGRAM'S TERMINAL, not in the browser.", fg="red", font=("Helvetica", 14, "bold"), wraplength=480, justify='center')
+                    msg.pack(fill='both', expand=True, padx=20, pady=12)
+                    btn = tk.Button(top, text="OK", command=lambda: (top.attributes('-topmost', False), top.destroy()))
+                    btn.pack(pady=(0, 12))
+                    top.transient(root)
+                    try:
+                        top.grab_set()
+                    except Exception:
+                        pass
+            root.after(0, _create)
+
+        import scrapper as _scr
+        _scr.show_attention_popup = _show_attention_popup
+    except Exception:
+        pass
+
     root.mainloop()
 
 

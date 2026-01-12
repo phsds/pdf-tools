@@ -1,3 +1,9 @@
+import shutil
+import fitz
+import os
+import threading
+import tools
+import credentials
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
@@ -6,18 +12,16 @@ from selenium.webdriver.support import expected_conditions as EC
 from PIL import Image
 from docx import Document
 from time import sleep
-import shutil
-import fitz
-import os
-import threading
+
 
 images_path = 'output-images/'
+cache_selemium = r'%USERPROFILE%\.cache\selenium'
 
 def delete_images():
     # Deletes the "output-images" folder if it exists
     if os.path.exists(images_path):
         shutil.rmtree(images_path)
-        print("Deleted the 'output-images' folder.")
+        print("Deleted the 'output-images' folder, wait a moment...")
     else:
         print("The 'output-images' folder does not exist.")
 
@@ -28,22 +32,43 @@ def check_path_images():
     else:
         print("Directory already created.")
         pass
+    
+def delete_chache():
+    # Resolves environment variables and user home, then deletes the selenium cache folder
+    resolved_path = os.path.expandvars(cache_selemium)
+    resolved_path = os.path.expanduser(resolved_path)
+    # If expansion didn't replace Windows-style %USERPROFILE%, fall back to HOME/USERPROFILE
+    if ('%' in resolved_path or '$' in resolved_path) and not os.path.exists(resolved_path):
+        home = os.environ.get('USERPROFILE') or os.environ.get('HOME')
+        if home:
+            resolved_path = os.path.join(home, '.cache', 'selenium')
+    resolved_path = os.path.normpath(resolved_path)
 
-import tools
-# ...código existente...
+    if os.path.exists(resolved_path):
+        try:
+            shutil.rmtree(resolved_path)
+            print(f"Deleted the 'selenium' cache folder at {resolved_path}, wait a moment...")
+        except Exception as e:
+            print(f"Failed to delete selenium cache folder '{resolved_path}': {e}")
+    else:
+        print(f"Selenium cache folder does not exist: {resolved_path}")
+
+# Callback defined by `main.py` to show an attention popup on the GUI thread
+# `main.py` will assign a function to this variable when initializing the GUI
+show_attention_popup = None
 
 def convert_pdf_pages_to_images(input_folder, output_folder="output-images", zoom=4.0, image_format="png"):
     """
     Converts PDF pages into high-quality images and checks dimensions to split wide images.
     """
-    # Junta todos os PDFs em um único arquivo antes de processar as imagens
+    # Merge all PDFs into a single file before processing images
     tools.merge_pdfs()
     merged_pdf_path = os.path.join("./results/", "merged.pdf")
 
-    # Cria a pasta de saída
+    # Create the output folder
     os.makedirs(output_folder, exist_ok=True)
 
-    # Processa apenas o PDF mesclado
+    # Process only the merged PDF
     pdf_files = [merged_pdf_path]
 
     def process_pdf(pdf_file):
@@ -130,6 +155,7 @@ def convert_pdf_pages_to_images(input_folder, output_folder="output-images", zoo
         thread.join()
 
     print("Processing completed.")
+    print("Starting the Pen-to-Print scrapper, wait a moment...")
         
 def activation():
     check_path_images()
@@ -161,11 +187,45 @@ def Pen_to_Print(browser):
     print("Login button clicked and popup opened.")
 
     # Step 2: Waits for the login popup and fills in the fields
+    # First check if credentials are already saved; if not, request them via the GUI console (blocking)
+    try:
+        email, password = credentials.get_credentials()
+        print("Credentials obtained from secure storage.")
+    except Exception:
+        # If the GUI recorded a popup, show it before requesting input
+        try:
+            if callable(show_attention_popup):
+                show_attention_popup()
+        except Exception:
+            pass
+
+        print("Credentials not found. Enter them in the GUI console to proceed.")
+        # Uses input() to block until the user types in the GUI (main replaces sys.stdin)
+        try:
+            email = input("Email para login: ")
+            password = input("Senha para login: ")
+        except Exception:
+            print("Failed to read user input. Aborting login.")
+            return
+
+        if not email or not password:
+            print("Email or password empty. Aborting login.")
+            return
+
+        try:
+            credentials.save_credentials(email, password)
+            print("Credentials saved successfully.")
+        except Exception as e:
+            print(f"Warning: could not save credentials: {e}")
+
+    # Fill in the fields on the form
     email_input = wait.until(EC.presence_of_element_located((By.NAME, "email")))
-    email_input.send_keys("pdfferramenta@outlook.com")
+    email_input.clear()
+    email_input.send_keys(email)
 
     password_input = wait.until(EC.presence_of_element_located((By.NAME, "password")))
-    password_input.send_keys("Gmo2Ha5z2!rio@by@Vb22hE68yj^eQKyWR%P9BB8C!58vNmjV899oTDA8CXZ82^&")
+    password_input.clear()
+    password_input.send_keys(password)
 
     # Clicks the "Login" button inside the popup
     popup_login_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, ".login-button button[type='submit']")))
@@ -232,7 +292,7 @@ def Pen_to_Print(browser):
 
            # Extracts the text from the pages and saves it in the Word file
             try:
-                # REGRA PARA SUBPASTA COM APENAS UMA IMAGEM/PÁGINA
+                # ORIGINAL RULE FOR ONE-PAGE SUBFOLDER
                 if len(batch_files) == 1:
                     try:
                         textarea = WebDriverWait(browser, 10).until(
@@ -246,10 +306,10 @@ def Pen_to_Print(browser):
                         print(f"Text extracted and saved in '{output_file}'.")
                     except Exception as e:
                         print(f"Error scraping single-page text: {e}")
-                    # Vai para a próxima iteração do while/for, não executa o restante do bloco
+                    # Goes to the next iteration of the while/for loop, does not execute the rest of the block
                     continue
 
-                # REGRA ORIGINAL PARA MAIS DE UMA PÁGINA
+                # ORIGINAL RULE FOR MULTI-PAGE SUBFOLDER
                 page_counter = browser.find_element(By.CLASS_NAME, "page-counter").text
                 current_page, total_pages = map(int, page_counter.split(" ")[1].split("/"))
 
@@ -304,6 +364,7 @@ def Pen_to_Print(browser):
     delete_images()  # Deletes the images after processing
     # Closes the browser
     browser.quit()
+    delete_chache()  # Deletes the cache after processing
 
 if __name__ == "__main__":
     pass
