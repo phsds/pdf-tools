@@ -31,31 +31,27 @@ def check_path_images():
         convert_pdf_pages_to_images("pdfs", "output-images")
     else:
         print("Directory already created.")
-        pass
     
 def delete_chache():
-    # Resolves environment variables and user home, then deletes the selenium cache folder
-    resolved_path = os.path.expandvars(cache_selemium)
-    resolved_path = os.path.expanduser(resolved_path)
-    # If expansion didn't replace Windows-style %USERPROFILE%, fall back to HOME/USERPROFILE
-    if ('%' in resolved_path or '$' in resolved_path) and not os.path.exists(resolved_path):
-        home = os.environ.get('USERPROFILE') or os.environ.get('HOME')
-        if home:
-            resolved_path = os.path.join(home, '.cache', 'selenium')
-    resolved_path = os.path.normpath(resolved_path)
+    # Performs the cache deletion process
+    safe_home = os.path.normpath(os.path.abspath(os.path.expanduser('~')))
+    safe_cache_path = os.path.join(safe_home, '.cache', 'selenium')
 
-    if os.path.exists(resolved_path):
+    if os.path.exists(safe_cache_path):
         try:
-            shutil.rmtree(resolved_path)
-            print(f"Deleted the 'selenium' cache folder at {resolved_path}, wait a moment...")
+            shutil.rmtree(safe_cache_path)
+            print(f"Deleted the 'selenium' cache folder at {safe_cache_path}, wait a moment...")
         except Exception as e:
-            print(f"Failed to delete selenium cache folder '{resolved_path}': {e}")
+            print(f"Failed to delete selenium cache folder '{safe_cache_path}': {e}")
     else:
-        print(f"Selenium cache folder does not exist: {resolved_path}")
+        print(f"Selenium cache folder does not exist: {safe_cache_path}")
 
 # Callback defined by `main.py` to show an attention popup on the GUI thread
 # `main.py` will assign a function to this variable when initializing the GUI
 show_attention_popup = None
+
+# Holds the active Selenium driver so it can be closed from anywhere (e.g. finish_program)
+_active_driver = None
 
 def convert_pdf_pages_to_images(input_folder, output_folder="output-images", zoom=4.0, image_format="png"):
     """
@@ -158,11 +154,26 @@ def convert_pdf_pages_to_images(input_folder, output_folder="output-images", zoo
     print("Starting the Pen-to-Print scrapper, wait a moment...")
         
 def activation():
+    global _active_driver
     check_path_images()
     chrome_options = Options()
     chrome_options.add_experimental_option("detach", True)
     driver = webdriver.Chrome(options=chrome_options)
+    _active_driver = driver
     return driver
+
+
+def close_browser():
+    """Quit the active Selenium browser if one is open."""
+    global _active_driver
+    if _active_driver is not None:
+        try:
+            _active_driver.quit()
+            print("Browser closed.")
+        except Exception as e:
+            print(f"Error closing browser: {e}")
+        finally:
+            _active_driver = None
 
 def Pen_to_Print(browser):
     # Logs into the website

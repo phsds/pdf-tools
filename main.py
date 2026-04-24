@@ -1,4 +1,5 @@
 import sys
+import os
 import tools
 import tkinter as tk
 from tkinter import messagebox
@@ -27,85 +28,83 @@ def run_in_thread(func):
     """Decorator to run a function in a separate thread."""
     def wrapper(*args, **kwargs):
         thread = threading.Thread(target=func, args=args, kwargs=kwargs)
+        thread.daemon = True  # Killed automatically when the main process exits
         thread.start()
     return wrapper
 
+
+def require_pdfs(func):
+    """Decorator: aborts execution if the /pdfs directory is empty."""
+    def wrapper(*args, **kwargs):
+        if not tools.check_pdfs():
+            print("Directory /pdfs is empty, please put a PDF file in it.")
+            return
+        return func(*args, **kwargs)
+    return wrapper
+
 @run_in_thread
+@require_pdfs
 def text_extraction():
-    if not tools.check_pdfs():  # Check if tools.check_pdfs() returns False
-        print("Directory /pdfs is empty, please put a PDF file in it.")
-        return  # Exit the function if the directory is empty
-    else:
-        print('Starting text extraction...\n')
-        time.sleep(1)
-        print('Opening PDF file...\n')
-        time.sleep(1)
-        tools.extractText()
-        print('Text extraction completed.\n')
-        messagebox.showinfo("Success", "Text extraction completed!")
+    print('Starting text extraction...\n')
+    time.sleep(1)
+    print('Opening PDF file...\n')
+    time.sleep(1)
+    tools.extractText()
+    print('Text extraction completed.\n')
+    messagebox.showinfo("Success", "Text extraction completed!")
 
 
 @run_in_thread
+@require_pdfs
 def image_extraction():
-    if not tools.check_pdfs():  # Check if tools.check_pdfs() returns False
-        print("Directory /pdfs is empty, please put a PDF file in it.")
-        return  # Exit the function if the directory is empty
-    else:
-        print('Starting image extraction...\n')
-        time.sleep(1)
-        print('Processing PDF pages...\n')
-        time.sleep(1)
-        tools.extractImage()
-        print('Image extraction completed.\n')
-        messagebox.showinfo("Success", "Image extraction completed!")
+    print('Starting image extraction...\n')
+    time.sleep(1)
+    print('Processing PDF pages...\n')
+    time.sleep(1)
+    tools.extractImage()
+    print('Image extraction completed.\n')
+    messagebox.showinfo("Success", "Image extraction completed!")
 
 
 @run_in_thread
+@require_pdfs
 def pdf_merge():
-    if not tools.check_pdfs():  # Check if tools.check_pdfs() returns False
-        print("Directory /pdfs is empty, please put a PDF file in it.")
-        return  # Exit the function if the directory is empty
-    else:
-        print('Starting PDF merge...\n')
-        time.sleep(1)
-        print('Reading PDF files...\n')
-        time.sleep(1)
-        tools.merge_pdfs()
-        print('PDF merge completed.\n')
-        messagebox.showinfo("Success", "PDFs merged successfully!")
+    print('Starting PDF merge...\n')
+    time.sleep(1)
+    print('Reading PDF files...\n')
+    time.sleep(1)
+    tools.merge_pdfs()
+    print('PDF merge completed.\n')
+    messagebox.showinfo("Success", "PDFs merged successfully!")
 
 
 @run_in_thread
+@require_pdfs
 def pdf_split_combine():
-    if not tools.check_pdfs():  # Check if tools.check_pdfs() returns False
-        print("Directory /pdfs is empty, please put a PDF file in it.")
-        return  # Exit the function if the directory is empty
-    else:
-        print('Starting PDF split and combine...\n')
-        time.sleep(1)
-        print('Splitting selected pages...\n')
-        time.sleep(1)
-        tools.split_combine()
-        print('PDF split and combine completed.\n')
-        messagebox.showinfo("Success", "PDF split and combine completed!")
+    print('Starting PDF split and combine...\n')
+    time.sleep(1)
+    print('Splitting selected pages...\n')
+    time.sleep(1)
+    tools.split_combine()
+    print('PDF split and combine completed.\n')
+    messagebox.showinfo("Success", "PDF split and combine completed!")
 
 
 @run_in_thread
+@require_pdfs
 def pdf_requests():
-    if not tools.check_pdfs():  # Check if tools.check_pdfs() returns False
-        print("Directory /pdfs is empty, please put a PDF file in it.")
-        return  # Exit the function if the directory is empty
-    else:
-        print('Starting PDF to PNG conversion and uploading to the website...\n')
-        time.sleep(1)
-        scrapper.Pen_to_Print(scrapper.activation())
-        print('PDF processing completed.\n')
-        messagebox.showinfo("Success", "PDF processing completed!")
-        
+    print('Starting PDF to PNG conversion and uploading to the website...\n')
+    time.sleep(1)
+    scrapper.Pen_to_Print(scrapper.activation())
+    print('PDF processing completed.\n')
+    messagebox.showinfo("Success", "PDF processing completed!")
+
 
 def finish_program():
     print("Closing the program...\n")
-    sys.exit(0)
+    scrapper.close_browser()   # Close Selenium browser if open
+    scrapper.delete_images()   # Remove output-images folder if it exists
+    os._exit(0)  # Force-terminates the process; daemon threads are killed automatically
 
 
 def main_menu():
