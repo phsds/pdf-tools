@@ -19,7 +19,7 @@ When the interface runs, the following options will be available:
 
 Main APIs used:
 
-- PyPDF2
+- pypdf
 - Pillow
 - python-docx
 - Selenium

@@ -1,7 +1,7 @@
 import os
 import re
 from shutil import move
-from PyPDF2 import PdfReader, PdfWriter, PdfMerger
+from pypdf import PdfReader, PdfWriter
 from time import sleep
 
 # hi, my friend
@@ -12,7 +12,7 @@ output_merger = 'merged.pdf'
 output_split = 'splited_combined.pdf'
 done = "All'"
 writer = PdfWriter()
-merger = PdfMerger()
+# PdfMerger is removed in pypdf 4.0+. We use PdfWriter instead.
 
 # HINT: The directory where PDF files are placed is "pdfs".
 # Create the `path` and `results` directories where saved PDFs will go.
@@ -24,7 +24,7 @@ def mkdir_results():
     if not os.path.exists(results):
         os.mkdir(results)
         
-#Check if the directory "path" have something in it, this function will substitute the bug of PyPDF2 where no FileNotFoundError errors are showed.
+#Check if the directory "path" have something in it, this function will substitute the bug of pypdf where no FileNotFoundError errors are showed.
 def check_paths():
     if not os.path.exists(path) or not os.path.exists(results):
         print('Folders /pdfs or /results not found, creating one of each.')
@@ -86,7 +86,7 @@ def merge_pdfs():
         [f for f in os.listdir(path) if f.lower().endswith('.pdf')],
         key=natural_key
     )
-    merger = PdfMerger()  # Ensure a fresh merger on each call
+    merger = PdfWriter()  # Ensure a fresh merger on each call
     for archive in pdf_files:
         pdf = os.path.join(path, archive)
         merger.append(pdf)
