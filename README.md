@@ -34,13 +34,14 @@ When using "**PDF - Split**", the application will ask in its terminal how many 
 In general, except for the last option, all features run directly from the GUI without browser interaction.
 
 After processing the "**PDF - Handwritten**" option, the PDFs are converted into temporary images that are uploaded to the website for processing and then removed:
+
 - You need to create an account on the [Pen-to-Print](https://www.pen-to-print.com/App/notes/) website.
 - A file named "credentials.dpapi" will be generated and should be placed in the same folder as the executable if you want your email and password to be saved.
 - To use a different account, simply delete the "credentials.dpapi" file.
-  
+
 "**PDF - Split**" and "**PDF - Handwritten**" will show a poppup "**PDF processing completed**" when the execution ends.
 
-### **ATTENTION!**: When performing any function of the program, do not interrupt it and wait for the process to finish.
+### **ATTENTION!**: When performing any function of the program, do not interrupt it and wait for the process to finish
 
 ## Licença
 
