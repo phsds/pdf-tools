@@ -95,7 +95,7 @@ def pdf_split_combine():
 def pdf_requests():
     print('Starting PDF to PNG conversion and uploading to the website...\n')
     time.sleep(1)
-    scrapper.Pen_to_Print(scrapper.activation())
+    scrapper.pen_to_print(scrapper.activation())
     print('PDF processing completed.\n')
     messagebox.showinfo("Success", "PDF processing completed!")
 
