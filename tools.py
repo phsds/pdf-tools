@@ -10,6 +10,7 @@ path = 'pdfs/'
 results = 'results/'
 output_merger = 'merged.pdf'
 output_split = 'splited_combined.pdf'
+done = "All'"
 writer = PdfWriter()
 merger = PdfMerger()
 
@@ -33,7 +34,6 @@ def check_paths():
         print('Folders created!')
     else:
         print("Folders already created.")
-        pass
 
 def check_pdfs():
     # Checks if the directory is empty
@@ -43,7 +43,7 @@ def check_pdfs():
 
 
     # Extract text from PDF files in the "pdfs" directory
-def extractText():
+def extract_text():
     for archive in os.listdir(path):
         pdf = os.path.join(path, archive)
         reader = PdfReader(pdf, 'rb')
@@ -54,7 +54,7 @@ def extractText():
         print(f'\n{pdf.replace("pdfs/", "").replace(".pdf", "")} extracted!')
 
 #Extract images from pdf files in "pdfs" directory
-def extractImage():
+def extract_images():
     try:
         for archive in os.listdir(path):
             pdf = os.path.join(path, archive)
@@ -67,12 +67,12 @@ def extractImage():
                             out.write(img_file_obj.data)
                         try:
                             move(f'{img_file_obj.name}', './results/')
-                        except:
+                        except Exception:
                             os.remove(img_file_obj.name)
     except Exception as err:
         print("There was an error with the PDF formatting, and it was not possible to extract all images.")
         print(f"\n {err}")
-    print('\nAll done!')
+    print(f'\n{done}')
 
 #Natural sorting function to sort the pdf files in the directory
 def natural_key(text):
@@ -95,16 +95,55 @@ def merge_pdfs():
     print('\nAll done!')
 
 #Especify a range of pdfs pages that will be splitted and merged into a singlefile.
-def split_combine():
+def _get_pages_per_file():
     # Ask the user how many pages per file they want
     while True:
         try:
             pages_per_file = int(input("How many pages per file? "))
             if pages_per_file <= 0:
                 raise ValueError()
-            break
+            return pages_per_file
         except ValueError:
             print("Please enter an integer greater than 0.")
+
+def _process_single_pdf(archive, pages_per_file):
+    pdf_path = os.path.join(path, archive)
+    reader = PdfReader(pdf_path)
+    total_pages = len(reader.pages)
+    base_name = os.path.splitext(archive)[0]
+
+    start = 0
+    while start < total_pages:
+        end = start + pages_per_file
+        # If end exceeds total_pages, adjust to the remainder
+        if end >= total_pages:
+            end = total_pages
+
+        writer = PdfWriter()
+        for p in range(start, end):
+            writer.add_page(reader.pages[p])
+
+        # Mount the name as requested: "pdf name (page or pages)"
+        if start + 1 == end:
+            page_label = f"{start+1}"
+        else:
+            page_label = f"{start+1}-{end}"
+
+        output_name = f"{base_name} ({page_label}).pdf"
+        output_path = os.path.join(results, output_name)
+
+        with open(output_path, 'wb') as out_f:
+            writer.write(out_f)
+
+        print(f"Saved: {output_path}")
+
+        start = end
+
+    print(f"{archive} processed ({total_pages} pages).")
+
+#Especify a range of pdfs pages that will be splitted and merged into a singlefile.
+def split_combine():
+    pages_per_file = _get_pages_per_file()
 
     # Ensure that the results folder exists
     if not os.path.exists(results):
@@ -114,43 +153,7 @@ def split_combine():
     pdf_files = sorted([f for f in os.listdir(path) if f.lower().endswith('.pdf')], key=natural_key)
 
     for archive in pdf_files:
-        pdf_path = os.path.join(path, archive)
-        reader = PdfReader(pdf_path)
-        total_pages = len(reader.pages)
-        base_name = os.path.splitext(archive)[0]
-
-        start = 0
-        while start < total_pages:
-            end = start + pages_per_file
-            # If end exceeds total_pages, adjust to the remainder
-            if end >= total_pages:
-                end = total_pages
-
-            writer = PdfWriter()
-            for p in range(start, end):
-                writer.add_page(reader.pages[p])
-
-            # Mount the name as requested: "pdf name (page or pages)"
-            if start + 1 == end:
-                page_label = f"{start+1}"
-            else:
-                page_label = f"{start+1}-{end}"
-
-            output_name = f"{base_name} ({page_label}).pdf"
-            output_path = os.path.join(results, output_name)
-
-            with open(output_path, 'wb') as out_f:
-                writer.write(out_f)
-
-            print(f"Saved: {output_path}")
-
-            start = end
-
-        print(f"{archive} processed ({total_pages} pages).")
+        _process_single_pdf(archive, pages_per_file)
 
     print('\nAll done!')
-
-# For debugging purposes. Remove the hash below if you want to execute this file directly.
-
-if __name__ == "__main__":
-    pass
+
