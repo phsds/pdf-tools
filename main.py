@@ -13,7 +13,7 @@ import queue
 If you want to convert to .exe, use the following command.
 OBS: you will need to install pyinstaller first: pip install pyinstaller
 
-pyinstaller --onefile --windowed --icon=icone.ico seu_script.py
+pyinstaller --onefile --windowed --icon=Logo.ico main.py
 
 """
 
