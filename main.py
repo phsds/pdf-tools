@@ -9,6 +9,15 @@ import threading
 import time
 import queue
 
+"""
+If you want to convert to .exe, use the following command.
+OBS: you will need to install pyinstaller first: pip install pyinstaller
+
+pyinstaller --onefile --windowed --icon=Logo.ico main.py
+
+"""
+
+
 #command for conversion to executable: pyinstaller --onefile --windowed --icon=Logo.ico main.py 
 class RedirectOutput:
     """Class to redirect stdout and stderr to the text widget."""
