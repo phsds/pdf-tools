@@ -2,6 +2,9 @@ import shutil
 import pypdfium2 as pdfium
 import os
 import threading
+import uuid
+import subprocess
+import tempfile
 import tools
 import credentials
 from selenium import webdriver
@@ -44,7 +47,7 @@ def check_path_images():
     else:
         print("Directory already created.")
 
-def delete_chache():
+def delete_cache():
     # Performs the cache deletion process
     safe_home = os.path.normpath(os.path.abspath(os.path.expanduser('~')))
     safe_cache_path = os.path.join(safe_home, '.cache', 'selenium')
@@ -57,6 +60,64 @@ def delete_chache():
             print(f"Failed to delete selenium cache folder '{safe_cache_path}': {e}")
     else:
         print(f"Selenium cache folder does not exist: {safe_cache_path}")
+
+
+def cleanup_scoped_dirs():
+    # Attempt to kill any hanging chromedriver processes to release file handles
+    print("Releasing Selenium handles...")
+    try:
+        subprocess.run(["taskkill", "/F", "/IM", "chromedriver.exe", "/T"], capture_output=True, check=False)
+    except Exception:
+        pass
+
+    temp_dir = tempfile.gettempdir()
+    if not os.path.exists(temp_dir):
+        return
+
+    print(f"Using Windows Shell API to clean up 'scoped_dir' folders in {temp_dir}...")
+    
+    # PowerShell script to use Shell.Application COM object (mimics Explorer behavior)
+    # We use -EncodedCommand to avoid any potential escaping issues with paths
+    ps_code = f"""
+    $shell = New-Object -ComObject Shell.Application
+    $tempPath = '{temp_dir}'
+    $tempFolder = $shell.NameSpace($tempPath)
+    if ($tempFolder) {{
+        Get-ChildItem -Path $tempPath -Filter 'scoped_dir*' -Directory | ForEach-Object {{
+            $oldName = $_.Name
+            $item = $tempFolder.ParseName($oldName)
+            if ($item) {{
+                $randomName = 'delete_me_' + [Guid]::NewGuid().ToString('N')
+                try {{
+                    $item.Name = $randomName
+                    $newItem = $tempFolder.ParseName($randomName)
+                    if ($newItem) {{
+                        Remove-Item -Path $newItem.Path -Recurse -Force -ErrorAction SilentlyContinue
+                        Write-Host "Successfully processed and deleted $oldName (renamed to $randomName)."
+                    }}
+                }} catch {{
+                    Write-Host "Failed to process $oldName via Shell API."
+                }}
+            }}
+        }}
+    }}
+    """
+    
+    try:
+        # Run the powershell command
+        result = subprocess.run(["powershell", "-Command", ps_code], capture_output=True, text=True, check=False)
+        if result.stdout:
+            print(result.stdout.strip())
+        
+        # Check if there are still scoped_dir folders left (for logging)
+        remaining = [d for d in os.listdir(temp_dir) if d.startswith("scoped_dir") and os.path.isdir(os.path.join(temp_dir, d))]
+        if not remaining:
+            print("Cleanup finished. All 'scoped_dir' folders removed.")
+        else:
+            print(f"Cleanup finished. {len(remaining)} folders could not be removed (still in use).")
+            
+    except Exception as e:
+        print(f"Error during Shell cleanup execution: {e}")
 
 
 def _render_page(pdf_document, page_number, output_image_path, zoom):
@@ -422,4 +483,5 @@ def pen_to_print(browser):
     print("Processing completed for all subfolders.")
     delete_images()
     browser.quit()
-    delete_chache()
+    delete_cache()
+    cleanup_scoped_dirs()
