@@ -19,7 +19,7 @@ When the interface runs, the following options will be available:
 
 Main APIs used:
 
-- PyPDF2
+- pypdf
 - Pillow
 - python-docx
 - Selenium
@@ -33,14 +33,27 @@ When using "**PDF - Split**", the application will ask in its terminal how many 
 
 In general, except for the last option, all features run directly from the GUI without browser interaction.
 
-After processing the "**PDF - Handwritten**" option, the PDFs are converted into temporary images that are uploaded to the website for processing and then removed:
-- You need to create an account on the [Pen-to-Print](https://www.pen-to-print.com/App/notes/) website.
-- A file named "credentials.dpapi" will be generated and should be placed in the same folder as the executable if you want your email and password to be saved.
-- To use a different account, simply delete the "credentials.dpapi" file.
-  
-"**PDF - Split**" and "**PDF - Handwritten**" will show a poppup "**PDF processing completed**" when the execution ends.
+### **PDF - Handwritten (Advanced OCR)**
 
-### **ATTENTION!**: When performing any function of the program, do not interrupt it and wait for the process to finish.
+This feature automates the conversion of handwritten or complex PDFs using the Pen-to-Print website. The process follows these steps:
+
+1. **Pre-processing**: The program merges all PDFs in the `pdfs` folder and converts them into high-quality images stored temporarily in `output-images`.
+2. **Web Automation**: A Selenium-controlled browser opens the Pen-to-Print website.
+3. **Authentication**:
+    - The program attempts to retrieve credentials from `credentials.dpapi`.
+    - If not found, it prompts you for your email and password via the GUI console.
+4. **OCR Processing**:
+    - Images are uploaded in batches of up to 50 pages.
+    - The website processes the handwriting into digital text.
+5. **Output**: The extracted text is compiled into a `.docx` document and saved in the `results` folder.
+6. **Full Cleanup**:
+    - Temporary images in `output-images` are deleted.
+    - The Selenium browser is closed.
+    - **Advanced System Cleanup**: The program automatically releases Selenium handles and uses the Windows Shell API (mimicking File Explorer behavior) to find and remove temporary Chrome folders (`scoped_dir*`). This ensures your system's Temp directory remains clean and free of "junk" folders. **Note**: An administrator prompt (UAC) may appear for each folder being processed to allow the Shell API to complete the deletion.
+
+"**PDF - Split**" and "**PDF - Handwritten**" will show a popup "**PDF processing completed**" when the execution ends.
+
+### **ATTENTION!**: When performing any function of the program, do not interrupt it and wait for the process to finish
 
 ## Licença
 

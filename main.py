@@ -1,4 +1,5 @@
 import sys
+import os
 import tools
 import tkinter as tk
 from tkinter import messagebox
@@ -27,85 +28,83 @@ def run_in_thread(func):
     """Decorator to run a function in a separate thread."""
     def wrapper(*args, **kwargs):
         thread = threading.Thread(target=func, args=args, kwargs=kwargs)
+        thread.daemon = True  # Killed automatically when the main process exits
         thread.start()
     return wrapper
 
+
+def require_pdfs(func):
+    """Decorator: aborts execution if the /pdfs directory is empty."""
+    def wrapper(*args, **kwargs):
+        if not tools.check_pdfs():
+            print("Directory /pdfs is empty, please put a PDF file in it.")
+            return
+        return func(*args, **kwargs)
+    return wrapper
+
 @run_in_thread
+@require_pdfs
 def text_extraction():
-    if not tools.check_pdfs():  # Check if tools.check_pdfs() returns False
-        print("Directory /pdfs is empty, please put a PDF file in it.")
-        return  # Exit the function if the directory is empty
-    else:
-        print('Starting text extraction...\n')
-        time.sleep(1)
-        print('Opening PDF file...\n')
-        time.sleep(1)
-        tools.extractText()
-        print('Text extraction completed.\n')
-        messagebox.showinfo("Success", "Text extraction completed!")
+    print('Starting text extraction...\n')
+    time.sleep(1)
+    print('Opening PDF file...\n')
+    time.sleep(1)
+    tools.extract_text()
+    print('Text extraction completed.\n')
+    messagebox.showinfo("Success", "Text extraction completed!")
 
 
 @run_in_thread
+@require_pdfs
 def image_extraction():
-    if not tools.check_pdfs():  # Check if tools.check_pdfs() returns False
-        print("Directory /pdfs is empty, please put a PDF file in it.")
-        return  # Exit the function if the directory is empty
-    else:
-        print('Starting image extraction...\n')
-        time.sleep(1)
-        print('Processing PDF pages...\n')
-        time.sleep(1)
-        tools.extractImage()
-        print('Image extraction completed.\n')
-        messagebox.showinfo("Success", "Image extraction completed!")
+    print('Starting image extraction...\n')
+    time.sleep(1)
+    print('Processing PDF pages...\n')
+    time.sleep(1)
+    tools.extract_images()
+    print('Image extraction completed.\n')
+    messagebox.showinfo("Success", "Image extraction completed!")
 
 
 @run_in_thread
+@require_pdfs
 def pdf_merge():
-    if not tools.check_pdfs():  # Check if tools.check_pdfs() returns False
-        print("Directory /pdfs is empty, please put a PDF file in it.")
-        return  # Exit the function if the directory is empty
-    else:
-        print('Starting PDF merge...\n')
-        time.sleep(1)
-        print('Reading PDF files...\n')
-        time.sleep(1)
-        tools.merge_pdfs()
-        print('PDF merge completed.\n')
-        messagebox.showinfo("Success", "PDFs merged successfully!")
+    print('Starting PDF merge...\n')
+    time.sleep(1)
+    print('Reading PDF files...\n')
+    time.sleep(1)
+    tools.merge_pdfs()
+    print('PDF merge completed.\n')
+    messagebox.showinfo("Success", "PDFs merged successfully!")
 
 
 @run_in_thread
+@require_pdfs
 def pdf_split_combine():
-    if not tools.check_pdfs():  # Check if tools.check_pdfs() returns False
-        print("Directory /pdfs is empty, please put a PDF file in it.")
-        return  # Exit the function if the directory is empty
-    else:
-        print('Starting PDF split and combine...\n')
-        time.sleep(1)
-        print('Splitting selected pages...\n')
-        time.sleep(1)
-        tools.split_combine()
-        print('PDF split and combine completed.\n')
-        messagebox.showinfo("Success", "PDF split and combine completed!")
+    print('Starting PDF split and combine...\n')
+    time.sleep(1)
+    print('Splitting selected pages...\n')
+    time.sleep(1)
+    tools.split_combine()
+    print('PDF split and combine completed.\n')
+    messagebox.showinfo("Success", "PDF split and combine completed!")
 
 
 @run_in_thread
+@require_pdfs
 def pdf_requests():
-    if not tools.check_pdfs():  # Check if tools.check_pdfs() returns False
-        print("Directory /pdfs is empty, please put a PDF file in it.")
-        return  # Exit the function if the directory is empty
-    else:
-        print('Starting PDF to PNG conversion and uploading to the website...\n')
-        time.sleep(1)
-        scrapper.Pen_to_Print(scrapper.activation())
-        print('PDF processing completed.\n')
-        messagebox.showinfo("Success", "PDF processing completed!")
-        
+    print('Starting PDF to PNG conversion and uploading to the website...\n')
+    time.sleep(1)
+    scrapper.pen_to_print(scrapper.activation())
+    print('PDF processing completed.\n')
+    messagebox.showinfo("Success", "PDF processing completed!")
+
 
 def finish_program():
     print("Closing the program...\n")
-    sys.exit(0)
+    scrapper.close_browser()   # Close Selenium browser if open
+    scrapper.delete_images()   # Remove output-images folder if it exists
+    os._exit(0)  # Force-terminates the process; daemon threads are killed automatically
 
 
 def main_menu():
@@ -144,31 +143,35 @@ def main_menu():
         description_label.config(text="")
         button.config(bg="#2e2e3e", fg="#ffffff")  # Reset to original colors
 
+    # Event constants to prevent magic strings code smell
+    EVENT_ENTER = "<Enter>"
+    EVENT_LEAVE = "<Leave>"
+
     # Buttons for the options
     btn_text_extraction = tk.Button(root, text="Text Extraction", command=text_extraction, width=30, bg="#2e2e3e", fg="#ffffff", relief="flat", font=("Helvetica", 12))
     btn_text_extraction.pack(pady=5)
-    btn_text_extraction.bind("<Enter>", lambda e: on_hover(e, "Extract text from PDF files.", btn_text_extraction))
-    btn_text_extraction.bind("<Leave>", lambda e: on_leave(e, btn_text_extraction))
+    btn_text_extraction.bind(EVENT_ENTER, lambda e: on_hover(e, "Extract text from PDF files.", btn_text_extraction))
+    btn_text_extraction.bind(EVENT_LEAVE, lambda e: on_leave(e, btn_text_extraction))
 
     btn_image_extraction = tk.Button(root, text="Image Extraction", command=image_extraction, width=30, bg="#2e2e3e", fg="#ffffff", relief="flat", font=("Helvetica", 12))
     btn_image_extraction.pack(pady=5)
-    btn_image_extraction.bind("<Enter>", lambda e: on_hover(e, "Extract images from PDF files.", btn_image_extraction))
-    btn_image_extraction.bind("<Leave>", lambda e: on_leave(e, btn_image_extraction))
+    btn_image_extraction.bind(EVENT_ENTER, lambda e: on_hover(e, "Extract images from PDF files.", btn_image_extraction))
+    btn_image_extraction.bind(EVENT_LEAVE, lambda e: on_leave(e, btn_image_extraction))
 
     btn_pdf_merge = tk.Button(root, text="PDF - Merge", command=pdf_merge, width=30, bg="#2e2e3e", fg="#ffffff", relief="flat", font=("Helvetica", 12))
     btn_pdf_merge.pack(pady=5)
-    btn_pdf_merge.bind("<Enter>", lambda e: on_hover(e, "Merge multiple PDF files into one.", btn_pdf_merge))
-    btn_pdf_merge.bind("<Leave>", lambda e: on_leave(e, btn_pdf_merge))
+    btn_pdf_merge.bind(EVENT_ENTER, lambda e: on_hover(e, "Merge multiple PDF files into one.", btn_pdf_merge))
+    btn_pdf_merge.bind(EVENT_LEAVE, lambda e: on_leave(e, btn_pdf_merge))
 
     btn_pdf_split_combine = tk.Button(root, text="PDF - Split", command=pdf_split_combine, width=30, bg="#2e2e3e", fg="#ffffff", relief="flat", font=("Helvetica", 12))
     btn_pdf_split_combine.pack(pady=5)
-    btn_pdf_split_combine.bind("<Enter>", lambda e: on_hover(e, "Split specific pages of PDFs.", btn_pdf_split_combine))
-    btn_pdf_split_combine.bind("<Leave>", lambda e: on_leave(e, btn_pdf_split_combine))
+    btn_pdf_split_combine.bind(EVENT_ENTER, lambda e: on_hover(e, "Split specific pages of PDFs.", btn_pdf_split_combine))
+    btn_pdf_split_combine.bind(EVENT_LEAVE, lambda e: on_leave(e, btn_pdf_split_combine))
 
     btn_pdf_requests = tk.Button(root, text="PDF - Handwritten", command=pdf_requests, width=30, bg="#2e2e3e", fg="#ffffff", relief="flat", font=("Helvetica", 12))
     btn_pdf_requests.pack(pady=5)
-    btn_pdf_requests.bind("<Enter>", lambda e: on_hover(e, "Use your account to automatize Pen-To-Print website's OCR process", btn_pdf_requests))
-    btn_pdf_requests.bind("<Leave>", lambda e: on_leave(e, btn_pdf_requests))
+    btn_pdf_requests.bind(EVENT_ENTER, lambda e: on_hover(e, "Use your account to automatize Pen-To-Print website's OCR process", btn_pdf_requests))
+    btn_pdf_requests.bind(EVENT_LEAVE, lambda e: on_leave(e, btn_pdf_requests))
 
     btn_finish = tk.Button(root, text="Finish Program", command=finish_program, width=30, bg="#e74c3c", fg="#ffffff", relief="flat", font=("Helvetica", 12))
     btn_finish.pack(pady=20)
@@ -180,10 +183,10 @@ def main_menu():
     def on_leave_finish(event):
         btn_finish.config(bg="#e74c3c")  # Reset to original red
 
-    btn_finish.bind("<Enter>", on_hover_finish)
-    btn_finish.bind("<Leave>", on_leave_finish)
-    btn_finish.bind("<Enter>", lambda e: description_label.config(text="Close the application."))
-    btn_finish.bind("<Leave>", lambda e: description_label.config(text=""))
+    btn_finish.bind(EVENT_ENTER, on_hover_finish)
+    btn_finish.bind(EVENT_LEAVE, on_leave_finish)
+    btn_finish.bind(EVENT_ENTER, lambda e: description_label.config(text="Close the application."))
+    btn_finish.bind(EVENT_LEAVE, lambda e: description_label.config(text=""))
 
     # Text widget to display terminal output
     output_text = ScrolledText(root, wrap=tk.WORD, height=50, width=70, bg="#2e2e3e", fg="#ffffff", font=("Consolas", 10), relief="flat")
