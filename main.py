@@ -2,12 +2,15 @@ import sys
 import os
 import tools
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, filedialog
 from tkinter.scrolledtext import ScrolledText
 import scrapper
 import threading
 import time
 import queue
+import pypdfium2 as pdfium
+from PIL import Image, ImageTk
+import pytesseract
 
 """
 If you want to convert to .exe, use the following command.
@@ -115,93 +118,331 @@ def finish_program():
     scrapper.delete_images()   # Remove output-images folder if it exists
     os._exit(0)  # Force-terminates the process; daemon threads are killed automatically
 
-
 def main_menu():
-    # Creates the main window
     root = tk.Tk()
-    root.title("PDF Tools")
+    root.title("PDF Tools (ABBYY Style)")
 
-    # Sets the window size
-    window_width = 600
-    window_height = 600
-
-    # Calculates the position to open the window on the right side and center vertically
+    window_width = 1200
+    window_height = 800
     screen_width = root.winfo_screenwidth()
     screen_height = root.winfo_screenheight()
-    position_x = screen_width - window_width - 50
+    position_x = (screen_width // 2) - (window_width // 2)
     position_y = (screen_height // 2) - (window_height // 2)
-
-    # Sets the window geometry
     root.geometry(f"{window_width}x{window_height}+{position_x}+{position_y}")
-    root.configure(bg="#1e1e2f")  # Dark blue-gray background
+    
+    # Light Theme
+    bg_main = "#f0f0f0"
+    bg_canvas = "#e0e0e0"
+    bg_text = "#ffffff"
+    root.configure(bg=bg_main)
 
-    # Title
-    title_label = tk.Label(root, text="PDF Tools", font=("Helvetica", 20, "bold"), bg="#1e1e2f", fg="#ffffff")
-    title_label.pack(pady=20)
+    # 1. Top Toolbar
+    toolbar = tk.Frame(root, bg=bg_main, bd=1, relief=tk.RAISED)
+    toolbar.pack(side=tk.TOP, fill=tk.X)
+    
+    btn_style = {"bg": bg_main, "fg": "black", "relief": "flat", "font": ("Helvetica", 10)}
+    
+    # 2. Main PanedWindow (Vertical: top=Workspace, bottom=Log)
+    v_paned = tk.PanedWindow(root, orient=tk.VERTICAL, bg=bg_main, sashwidth=5)
+    v_paned.pack(fill=tk.BOTH, expand=True)
 
-    # Description label for hover effect
-    description_label = tk.Label(root, text="", font=("Helvetica", 12), bg="#1e1e2f", fg="#a9a9b3")
-    description_label.pack(pady=10)
+    # 3. Workspace PanedWindow (Horizontal: Left=Thumbnails, Right=Dual Viewer)
+    h_paned = tk.PanedWindow(v_paned, orient=tk.HORIZONTAL, bg=bg_main, sashwidth=5)
+    v_paned.add(h_paned, minsize=500)
 
-    # Function to update the description on hover
-    def on_hover(event, text, button):
-        description_label.config(text=text)
-        button.config(bg="#4a90e2", fg="#ffffff")  # Highlight with blue
+    # 4. Left Sidebar for Thumbnails
+    sidebar_frame = tk.Frame(h_paned, bg=bg_main, width=150)
+    h_paned.add(sidebar_frame, minsize=100)
+    
+    # 5. Dual Viewer PanedWindow
+    dual_paned = tk.PanedWindow(h_paned, orient=tk.HORIZONTAL, bg=bg_main, sashwidth=5)
+    h_paned.add(dual_paned, minsize=600)
+    
+    # 5a. PDF Viewer (Left of Dual Viewer)
+    pdf_viewer_frame = tk.Frame(dual_paned, bg=bg_canvas)
+    dual_paned.add(pdf_viewer_frame, minsize=300)
+    
+    # 5b. OCR Text Editor (Right of Dual Viewer)
+    ocr_viewer_frame = tk.Frame(dual_paned, bg=bg_text)
+    dual_paned.add(ocr_viewer_frame, minsize=300)
 
-    def on_leave(event, button):
-        description_label.config(text="")
-        button.config(bg="#2e2e3e", fg="#ffffff")  # Reset to original colors
+    # 6. Bottom Console
+    console_frame = tk.Frame(v_paned, bg=bg_main)
+    v_paned.add(console_frame, minsize=100)
 
-    # Event constants to prevent magic strings code smell
-    EVENT_ENTER = "<Enter>"
-    EVENT_LEAVE = "<Leave>"
+    # --- Setup PDF Viewer ---
+    viewer_controls = tk.Frame(pdf_viewer_frame, bg=bg_main)
+    viewer_controls.pack(side=tk.TOP, fill=tk.X)
+    
+    canvas_container = tk.Frame(pdf_viewer_frame, bg=bg_canvas)
+    canvas_container.pack(fill=tk.BOTH, expand=True)
+    
+    canvas = tk.Canvas(canvas_container, bg=bg_canvas, highlightthickness=0, cursor="crosshair")
+    vbar = tk.Scrollbar(canvas_container, orient=tk.VERTICAL, command=canvas.yview)
+    hbar = tk.Scrollbar(canvas_container, orient=tk.HORIZONTAL, command=canvas.xview)
+    canvas.configure(yscrollcommand=vbar.set, xscrollcommand=hbar.set)
+    vbar.pack(side=tk.RIGHT, fill=tk.Y)
+    hbar.pack(side=tk.BOTTOM, fill=tk.X)
+    canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-    # Buttons for the options
-    btn_text_extraction = tk.Button(root, text="Text Extraction", command=text_extraction, width=30, bg="#2e2e3e", fg="#ffffff", relief="flat", font=("Helvetica", 12))
-    btn_text_extraction.pack(pady=5)
-    btn_text_extraction.bind(EVENT_ENTER, lambda e: on_hover(e, "Extract text from PDF files.", btn_text_extraction))
-    btn_text_extraction.bind(EVENT_LEAVE, lambda e: on_leave(e, btn_text_extraction))
+    # --- Setup OCR Text Editor ---
+    ocr_label = tk.Label(ocr_viewer_frame, text="Recognized Text", bg=bg_main, font=("Helvetica", 10, "bold"))
+    ocr_label.pack(side=tk.TOP, fill=tk.X)
+    
+    ocr_text = ScrolledText(ocr_viewer_frame, wrap=tk.WORD, bg=bg_text, fg="black", font=("Times New Roman", 12))
+    ocr_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-    btn_image_extraction = tk.Button(root, text="Image Extraction", command=image_extraction, width=30, bg="#2e2e3e", fg="#ffffff", relief="flat", font=("Helvetica", 12))
-    btn_image_extraction.pack(pady=5)
-    btn_image_extraction.bind(EVENT_ENTER, lambda e: on_hover(e, "Extract images from PDF files.", btn_image_extraction))
-    btn_image_extraction.bind(EVENT_LEAVE, lambda e: on_leave(e, btn_image_extraction))
+    # --- Setup Console ---
+    console_label = tk.Label(console_frame, text="Terminal Output", bg=bg_main, anchor="w")
+    console_label.pack(side=tk.TOP, fill=tk.X)
+    output_text = ScrolledText(console_frame, wrap=tk.WORD, height=8, bg="#2e2e3e", fg="#ffffff", font=("Consolas", 10))
+    output_text.pack(fill=tk.BOTH, expand=True)
 
-    btn_pdf_merge = tk.Button(root, text="PDF - Merge", command=pdf_merge, width=30, bg="#2e2e3e", fg="#ffffff", relief="flat", font=("Helvetica", 12))
-    btn_pdf_merge.pack(pady=5)
-    btn_pdf_merge.bind(EVENT_ENTER, lambda e: on_hover(e, "Merge multiple PDF files into one.", btn_pdf_merge))
-    btn_pdf_merge.bind(EVENT_LEAVE, lambda e: on_leave(e, btn_pdf_merge))
+    # PDF State
+    draw_mode = tk.StringVar(value="text")
+    viewer_state = {
+        'pdf': None,
+        'current_page': 0,
+        'num_pages': 0,
+        'scale': 1.0,
+        'photo_img': None,
+        'pil_image': None,
+        'img_id': None,
+        'rectangles': [],
+        'temp_rect_id': None
+    }
+    
+    page_label = tk.Label(viewer_controls, text="No PDF loaded", bg=bg_main)
+    
+    def show_page():
+        if not viewer_state['pdf']: return
+        page = viewer_state['pdf'][viewer_state['current_page']]
+        bitmap = page.render(scale=viewer_state['scale'])
+        pil_image = bitmap.to_pil()
+        viewer_state['pil_image'] = pil_image
+        viewer_state['photo_img'] = ImageTk.PhotoImage(pil_image)
+        
+        canvas.delete("all")
+        viewer_state['img_id'] = canvas.create_image(0, 0, anchor=tk.NW, image=viewer_state['photo_img'])
+        canvas.config(scrollregion=canvas.bbox("all"))
+        page_label.config(text=f"Page {viewer_state['current_page'] + 1} of {viewer_state['num_pages']}")
+        viewer_state['rectangles'] = []
+        viewer_state['temp_rect_id'] = None
 
-    btn_pdf_split_combine = tk.Button(root, text="PDF - Split", command=pdf_split_combine, width=30, bg="#2e2e3e", fg="#ffffff", relief="flat", font=("Helvetica", 12))
-    btn_pdf_split_combine.pack(pady=5)
-    btn_pdf_split_combine.bind(EVENT_ENTER, lambda e: on_hover(e, "Split specific pages of PDFs.", btn_pdf_split_combine))
-    btn_pdf_split_combine.bind(EVENT_LEAVE, lambda e: on_leave(e, btn_pdf_split_combine))
+    def prev_page():
+        if viewer_state['current_page'] > 0:
+            viewer_state['current_page'] -= 1
+            show_page()
 
-    btn_pdf_requests = tk.Button(root, text="PDF - Handwritten", command=pdf_requests, width=30, bg="#2e2e3e", fg="#ffffff", relief="flat", font=("Helvetica", 12))
-    btn_pdf_requests.pack(pady=5)
-    btn_pdf_requests.bind(EVENT_ENTER, lambda e: on_hover(e, "Use your account to automatize Pen-To-Print website's OCR process", btn_pdf_requests))
-    btn_pdf_requests.bind(EVENT_LEAVE, lambda e: on_leave(e, btn_pdf_requests))
+    def next_page():
+        if viewer_state['current_page'] < viewer_state['num_pages'] - 1:
+            viewer_state['current_page'] += 1
+            show_page()
 
-    btn_finish = tk.Button(root, text="Finish Program", command=finish_program, width=30, bg="#e74c3c", fg="#ffffff", relief="flat", font=("Helvetica", 12))
-    btn_finish.pack(pady=20)
+    def zoom_in():
+        viewer_state['scale'] *= 1.2
+        show_page()
 
-    # Add hover effect for the Finish Program button
-    def on_hover_finish(event):
-        btn_finish.config(bg="#ff6b6b")  # Lighter red on hover
+    def zoom_out():
+        viewer_state['scale'] /= 1.2
+        show_page()
 
-    def on_leave_finish(event):
-        btn_finish.config(bg="#e74c3c")  # Reset to original red
+    def load_pdf():
+        filepath = filedialog.askopenfilename(title="Select a PDF", filetypes=[("PDF files", "*.pdf")])
+        if not filepath:
+            return
+        try:
+            viewer_state['pdf'] = pdfium.PdfDocument(filepath)
+            viewer_state['num_pages'] = len(viewer_state['pdf'])
+            viewer_state['current_page'] = 0
+            viewer_state['scale'] = 1.0
+            show_page()
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to open PDF: {e}")
 
-    btn_finish.bind(EVENT_ENTER, on_hover_finish)
-    btn_finish.bind(EVENT_LEAVE, on_leave_finish)
-    btn_finish.bind(EVENT_ENTER, lambda e: description_label.config(text="Close the application."))
-    btn_finish.bind(EVENT_LEAVE, lambda e: description_label.config(text=""))
+    # Bounding Box Logic
+    start_x = start_y = 0
+    drag_state = {
+        'moving_rect': None,    # dict entry from viewer_state['rectangles'] being moved
+        'offset_x': 0,
+        'offset_y': 0,
+        'drawing': False        # True if drawing a new rectangle
+    }
 
-    # Text widget to display terminal output
-    output_text = ScrolledText(root, wrap=tk.WORD, height=50, width=70, bg="#2e2e3e", fg="#ffffff", font=("Consolas", 10), relief="flat")
-    output_text.pack(pady=10)
+    def find_rect_at(cx, cy):
+        """Return the topmost rectangle that contains point (cx, cy), or None."""
+        for r in reversed(viewer_state['rectangles']):
+            x1, y1, x2, y2 = r['coords']
+            if x1 <= cx <= x2 and y1 <= cy <= y2:
+                return r
+        return None
 
-    # Make the log widget interactive: allow typing and connect to sys.stdin
+    def on_button_press(event):
+        nonlocal start_x, start_y
+        cx = canvas.canvasx(event.x)
+        cy = canvas.canvasy(event.y)
+
+        hit = find_rect_at(cx, cy)
+        if hit:
+            # Enter move mode for this existing rectangle
+            drag_state['moving_rect'] = hit
+            drag_state['offset_x'] = cx - hit['coords'][0]
+            drag_state['offset_y'] = cy - hit['coords'][1]
+            drag_state['drawing'] = False
+            canvas.config(cursor="fleur")    # move cursor
+        else:
+            # Start drawing a new rectangle
+            start_x, start_y = cx, cy
+            drag_state['moving_rect'] = None
+            drag_state['drawing'] = True
+            if viewer_state['temp_rect_id']:
+                canvas.delete(viewer_state['temp_rect_id'])
+            color = 'green' if draw_mode.get() == 'text' else 'blue'
+            viewer_state['temp_rect_id'] = canvas.create_rectangle(cx, cy, cx, cy, outline=color, width=2)
+            canvas.config(cursor="crosshair")
+
+    def on_move_press(event):
+        cx = canvas.canvasx(event.x)
+        cy = canvas.canvasy(event.y)
+
+        if drag_state['moving_rect'] is not None:
+            # Move existing rectangle
+            r = drag_state['moving_rect']
+            x1, y1, x2, y2 = r['coords']
+            w = x2 - x1
+            h = y2 - y1
+            new_x1 = cx - drag_state['offset_x']
+            new_y1 = cy - drag_state['offset_y']
+            new_x2 = new_x1 + w
+            new_y2 = new_y1 + h
+            r['coords'] = (new_x1, new_y1, new_x2, new_y2)
+            canvas.coords(r['id'], new_x1, new_y1, new_x2, new_y2)
+        elif drag_state['drawing'] and viewer_state['temp_rect_id']:
+            canvas.coords(viewer_state['temp_rect_id'], start_x, start_y, cx, cy)
+
+    def on_button_release(event):
+        if drag_state['moving_rect'] is not None:
+            drag_state['moving_rect'] = None
+            canvas.config(cursor="crosshair")
+            return
+
+        if not drag_state['drawing']:
+            return
+
+        drag_state['drawing'] = False
+        end_x = canvas.canvasx(event.x)
+        end_y = canvas.canvasy(event.y)
+
+        x1, x2 = min(start_x, end_x), max(start_x, end_x)
+        y1, y2 = min(start_y, end_y), max(start_y, end_y)
+
+        if x2 - x1 < 10 or y2 - y1 < 10:
+            if viewer_state['temp_rect_id']:
+                canvas.delete(viewer_state['temp_rect_id'])
+                viewer_state['temp_rect_id'] = None
+            return
+
+        viewer_state['rectangles'].append({
+            'id': viewer_state['temp_rect_id'],
+            'type': draw_mode.get(),
+            'coords': (x1, y1, x2, y2)
+        })
+        viewer_state['temp_rect_id'] = None
+
+    def clear_rectangles():
+        for r in viewer_state['rectangles']:
+            canvas.delete(r['id'])
+        viewer_state['rectangles'] = []
+        if viewer_state['temp_rect_id']:
+            canvas.delete(viewer_state['temp_rect_id'])
+            viewer_state['temp_rect_id'] = None
+
+    def recognize_areas():
+        if not viewer_state['pil_image'] or not viewer_state['rectangles']:
+            messagebox.showinfo("Info", "Please draw selection areas first.")
+            return
+            
+        def do_ocr():
+            try:
+                def update_ui_start():
+                    ocr_text.delete(1.0, tk.END)
+                    ocr_text.insert(tk.END, "[Recognizing selected areas...]\n\n")
+                root.after(0, update_ui_start)
+                
+                if os.path.exists(r'C:\Users\phsds\Programming\PDF-Tools\tesseract.exe'):
+                    pytesseract.pytesseract.tesseract_cmd = r'C:\Users\phsds\Programming\PDF-Tools\tesseract.exe'
+                    
+                full_text = ""
+                
+                for i, r in enumerate(viewer_state['rectangles']):
+                    crop = viewer_state['pil_image'].crop(r['coords'])
+                    
+                    config = '--psm 6' if r['type'] == 'table' else ''
+                    
+                    text = pytesseract.image_to_string(crop, lang='eng', config=config)
+                    
+                    full_text += f"--- Block {i+1} ({r['type'].upper()}) ---\n"
+                    full_text += text.strip() + "\n\n"
+                    
+                def update_ui_end(text):
+                    ocr_text.delete(1.0, tk.END)
+                    ocr_text.insert(tk.END, text)
+                root.after(0, update_ui_end, full_text)
+                
+            except Exception as e:
+                def update_ui_err(err):
+                    print(f"OCR Error: {err}")
+                root.after(0, update_ui_err, e)
+                
+        threading.Thread(target=do_ocr, daemon=True).start()
+
+    canvas.bind("<ButtonPress-1>", on_button_press)
+    canvas.bind("<B1-Motion>", on_move_press)
+    canvas.bind("<ButtonRelease-1>", on_button_release)
+
+    # Viewer controls
+    btn_prev = tk.Button(viewer_controls, text="◄ Prev", command=prev_page, **btn_style)
+    btn_prev.pack(side=tk.LEFT, padx=5, pady=2)
+    page_label.pack(side=tk.LEFT, padx=5, pady=2)
+    btn_next = tk.Button(viewer_controls, text="Next ►", command=next_page, **btn_style)
+    btn_next.pack(side=tk.LEFT, padx=5, pady=2)
+    
+    tk.Label(viewer_controls, text="|", bg=bg_main).pack(side=tk.LEFT, padx=5)
+    
+    tk.Radiobutton(viewer_controls, text="Text", variable=draw_mode, value="text", bg=bg_main).pack(side=tk.LEFT)
+    tk.Radiobutton(viewer_controls, text="Table", variable=draw_mode, value="table", bg=bg_main).pack(side=tk.LEFT)
+    
+    tk.Button(viewer_controls, text="Clear", command=clear_rectangles, **btn_style).pack(side=tk.LEFT, padx=5)
+    
+    btn_recognize = tk.Button(viewer_controls, text="Recognize Page", command=recognize_areas, bg="#4a90e2", fg="white", relief="flat", font=("Helvetica", 10, "bold"))
+    btn_recognize.pack(side=tk.RIGHT, padx=5, pady=2)
+    
+    btn_zout = tk.Button(viewer_controls, text="Zoom Out (-)", command=zoom_out, **btn_style)
+    btn_zout.pack(side=tk.RIGHT, padx=5, pady=2)
+    btn_zin = tk.Button(viewer_controls, text="Zoom In (+)", command=zoom_in, **btn_style)
+    btn_zin.pack(side=tk.RIGHT, padx=5, pady=2)
+    btn_zin = tk.Button(viewer_controls, text="Zoom In (+)", command=zoom_in, **btn_style)
+    btn_zin.pack(side=tk.LEFT, padx=5, pady=2)
+    btn_zout = tk.Button(viewer_controls, text="Zoom Out (-)", command=zoom_out, **btn_style)
+    btn_zout.pack(side=tk.LEFT, padx=5, pady=2)
+
+    # Top Toolbar Buttons
+    tk.Button(toolbar, text="Open PDF", command=load_pdf, **btn_style).pack(side=tk.LEFT, padx=5, pady=5)
+    
+    def make_action(func):
+        def wrapper():
+            func()
+        return wrapper
+        
+    tk.Button(toolbar, text="Text Extraction", command=make_action(text_extraction), **btn_style).pack(side=tk.LEFT, padx=5)
+    tk.Button(toolbar, text="Image Extraction", command=make_action(image_extraction), **btn_style).pack(side=tk.LEFT, padx=5)
+    tk.Button(toolbar, text="Merge PDFs", command=make_action(pdf_merge), **btn_style).pack(side=tk.LEFT, padx=5)
+    tk.Button(toolbar, text="Split PDFs", command=make_action(pdf_split_combine), **btn_style).pack(side=tk.LEFT, padx=5)
+    tk.Button(toolbar, text="Handwritten OCR", command=make_action(pdf_requests), **btn_style).pack(side=tk.LEFT, padx=5)
+    
+    tk.Button(toolbar, text="Exit", command=finish_program, bg="#e74c3c", fg="white", relief="flat").pack(side=tk.RIGHT, padx=5)
+
+    # Terminal Logic
     class GuiStdin:
         def __init__(self, text_widget):
             self.text_widget = text_widget
@@ -209,9 +450,7 @@ def main_menu():
             self.last_prompt_index = None
 
         def _show_prompt(self):
-            # Insert a prompt marker where user can type
             try:
-                # Ensure widget ends with a newline before inserting prompt
                 end_index = self.text_widget.index('end-1c')
                 last_char = self.text_widget.get(f"{end_index}", f"{end_index}")
             except Exception:
@@ -220,18 +459,15 @@ def main_menu():
                 self.text_widget.insert('end', "\n")
             self.text_widget.insert('end', ">>> ")
             self.text_widget.see('end')
-            # store the index where user input starts
             self.last_prompt_index = self.text_widget.index('end-1c')
             self.text_widget.focus_set()
 
         def readline(self, *args, **kwargs):
-            # Schedule prompt insertion in the GUI thread
             try:
                 self.text_widget.after(0, self._show_prompt)
             except Exception:
                 pass
-            # Wait for user input from the queue
-            line = self.queue.get()  # blocks until GUI puts input
+            line = self.queue.get()
             return line + "\n"
 
         def read(self, *args, **kwargs):
@@ -240,21 +476,16 @@ def main_menu():
     gui_stdin = GuiStdin(output_text)
 
     def _on_enter(event):
-        # Called when user presses Enter inside the text widget
         try:
             if gui_stdin.last_prompt_index:
                 start = gui_stdin.last_prompt_index
-                # Get user-typed content from prompt start to end
                 user_text = output_text.get(start, 'end-1c')
-                # Clean trailing newline if present
                 user_text = user_text.rstrip('\n')
                 gui_stdin.queue.put(user_text)
-                # Echo newline to the widget
                 output_text.insert('end', '\n')
                 gui_stdin.last_prompt_index = None
-                return 'break'  # prevent default newline insertion
+                return 'break'
             else:
-                # Fallback: send current line
                 line = output_text.get('insert linestart', 'insert lineend')
                 gui_stdin.queue.put(line)
                 output_text.insert('end', '\n')
@@ -263,38 +494,27 @@ def main_menu():
             print(f"Error handling input: {e}")
             return None
 
-    # Allow typing and bind Enter
     output_text.config(state='normal')
     output_text.bind('<Return>', _on_enter)
-    # Replace sys.stdin with our GUI stdin
     import sys as _sys
     _sys.stdin = gui_stdin
-
-    # Redirects stdout and stderr to the text widget
     sys.stdout = RedirectOutput(output_text)
     sys.stderr = RedirectOutput(output_text)
 
-    # Automatically call tools.check_path() after the GUI is initialized
     def initialize_check_path():
         print("Initializing check_path function...\n")
         tools.check_paths()
-
-        # Clear the terminal after 2 seconds
         def clear_terminal():
             output_text.delete(1.0, tk.END)
+        root.after(1000, clear_terminal)
 
-        root.after(1000, clear_terminal)  # Schedule terminal clearing after 2 seconds
+    root.after(100, initialize_check_path)
 
-    root.after(100, initialize_check_path)  # Calls the function after 100ms
-
-    # Starts the main GUI loop
-    # Register scrapper popup callback so scrapper can request GUI popups
     try:
         def _show_attention_popup():
             def _create():
                     top = tk.Toplevel(root)
                     top.title("ATENÇÃO!")
-                    # Increase size and center on screen; make topmost so it's between GUI and browser
                     popup_w, popup_h = 520, 160
                     screen_w = root.winfo_screenwidth()
                     screen_h = root.winfo_screenheight()
@@ -303,7 +523,6 @@ def main_menu():
                     top.geometry(f"{popup_w}x{popup_h}+{pos_x}+{pos_y}")
                     top.attributes("-topmost", True)
                     top.lift()
-                    # message in red, larger font
                     msg = tk.Label(top, text="Enter your email and password in the PROGRAM'S TERMINAL, not in the browser.", fg="red", font=("Helvetica", 14, "bold"), wraplength=480, justify='center')
                     msg.pack(fill='both', expand=True, padx=20, pady=12)
                     btn = tk.Button(top, text="OK", command=lambda: (top.attributes('-topmost', False), top.destroy()))
