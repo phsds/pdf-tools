@@ -261,16 +261,54 @@ def main_menu():
             messagebox.showerror("Error", f"Failed to open PDF: {e}")
 
     # Bounding Box Logic
+    HANDLE_SIZE = 7   # pixels — radius of corner resize handle squares
     start_x = start_y = 0
     drag_state = {
-        'moving_rect': None,    # dict entry from viewer_state['rectangles'] being moved
+        'mode': None,         # 'draw' | 'move' | 'resize'
+        'target': None,       # dict entry from viewer_state['rectangles']
         'offset_x': 0,
         'offset_y': 0,
-        'drawing': False        # True if drawing a new rectangle
+        'anchor': None,       # (ax, ay) — fixed corner when resizing
+        'handle_ids': [],     # canvas IDs of the small corner squares
     }
 
+    # -----------------------------------------------------------------
+    # Helper: draw/refresh small square handles on all rectangles
+    # -----------------------------------------------------------------
+    def refresh_handles():
+        for hid in drag_state['handle_ids']:
+            canvas.delete(hid)
+        drag_state['handle_ids'] = []
+
+        for r in viewer_state['rectangles']:
+            x1, y1, x2, y2 = r['coords']
+            corners = [(x1, y1), (x2, y1), (x1, y2), (x2, y2)]
+            for cx, cy in corners:
+                hid = canvas.create_rectangle(
+                    cx - HANDLE_SIZE, cy - HANDLE_SIZE,
+                    cx + HANDLE_SIZE, cy + HANDLE_SIZE,
+                    fill='white', outline=('green' if r['type'] == 'text' else 'blue'),
+                    width=2, tags='handle'
+                )
+                drag_state['handle_ids'].append(hid)
+
+    # -----------------------------------------------------------------
+    # Helper: find which corner handle (and its parent rect) was clicked
+    # Returns (rect_dict, anchor_x, anchor_y) or None
+    # -----------------------------------------------------------------
+    def find_handle_at(cx, cy):
+        for r in viewer_state['rectangles']:
+            x1, y1, x2, y2 = r['coords']
+            corners = [(x1, y1, x2, y2), (x2, y1, x1, y2),
+                       (x1, y2, x2, y1), (x2, y2, x1, y1)]
+            # (hx, hy) is the handle corner; (ax, ay) is the opposite (anchor)
+            for hx, hy, ax, ay in corners:
+                if abs(cx - hx) <= HANDLE_SIZE + 2 and abs(cy - hy) <= HANDLE_SIZE + 2:
+                    return r, ax, ay
+        return None
+
     def find_rect_at(cx, cy):
-        """Return the topmost rectangle that contains point (cx, cy), or None."""
+        """Return the topmost rectangle body that contains (cx, cy), or None."""
         for r in reversed(viewer_state['rectangles']):
             x1, y1, x2, y2 = r['coords']
             if x1 <= cx <= x2 and y1 <= cy <= y2:
@@ -282,54 +320,90 @@ def main_menu():
         cx = canvas.canvasx(event.x)
         cy = canvas.canvasy(event.y)
 
+        # Priority 1: resize handle
+        result = find_handle_at(cx, cy)
+        if result:
+            r, ax, ay = result
+            drag_state['mode'] = 'resize'
+            drag_state['target'] = r
+            drag_state['anchor'] = (ax, ay)
+            canvas.config(cursor="sizing")
+            return
+
+        # Priority 2: move existing rect
         hit = find_rect_at(cx, cy)
         if hit:
-            # Enter move mode for this existing rectangle
-            drag_state['moving_rect'] = hit
+            drag_state['mode'] = 'move'
+            drag_state['target'] = hit
             drag_state['offset_x'] = cx - hit['coords'][0]
             drag_state['offset_y'] = cy - hit['coords'][1]
-            drag_state['drawing'] = False
-            canvas.config(cursor="fleur")    # move cursor
-        else:
-            # Start drawing a new rectangle
-            start_x, start_y = cx, cy
-            drag_state['moving_rect'] = None
-            drag_state['drawing'] = True
-            if viewer_state['temp_rect_id']:
-                canvas.delete(viewer_state['temp_rect_id'])
-            color = 'green' if draw_mode.get() == 'text' else 'blue'
-            viewer_state['temp_rect_id'] = canvas.create_rectangle(cx, cy, cx, cy, outline=color, width=2)
-            canvas.config(cursor="crosshair")
+            canvas.config(cursor="fleur")
+            return
+
+        # Priority 3: draw new rectangle
+        start_x, start_y = cx, cy
+        drag_state['mode'] = 'draw'
+        drag_state['target'] = None
+        if viewer_state['temp_rect_id']:
+            canvas.delete(viewer_state['temp_rect_id'])
+        color = 'green' if draw_mode.get() == 'text' else 'blue'
+        viewer_state['temp_rect_id'] = canvas.create_rectangle(cx, cy, cx, cy, outline=color, width=2)
+        canvas.config(cursor="crosshair")
 
     def on_move_press(event):
         cx = canvas.canvasx(event.x)
         cy = canvas.canvasy(event.y)
+        mode = drag_state['mode']
 
-        if drag_state['moving_rect'] is not None:
-            # Move existing rectangle
-            r = drag_state['moving_rect']
+        if mode == 'resize':
+            r = drag_state['target']
+            ax, ay = drag_state['anchor']
+            x1, x2 = min(ax, cx), max(ax, cx)
+            y1, y2 = min(ay, cy), max(ay, cy)
+            r['coords'] = (x1, y1, x2, y2)
+            canvas.coords(r['id'], x1, y1, x2, y2)
+            refresh_handles()
+            refresh_dividers(r)
+
+        elif mode == 'move':
+            r = drag_state['target']
             x1, y1, x2, y2 = r['coords']
             w = x2 - x1
             h = y2 - y1
-            new_x1 = cx - drag_state['offset_x']
-            new_y1 = cy - drag_state['offset_y']
+            dx = (cx - drag_state['offset_x']) - x1
+            dy = (cy - drag_state['offset_y']) - y1
+            new_x1 = x1 + dx
+            new_y1 = y1 + dy
             new_x2 = new_x1 + w
             new_y2 = new_y1 + h
+            # also shift dividers
+            for div in r.get('dividers', []):
+                if div['type'] == 'col':
+                    div['x'] += dx
+                else:
+                    div['y'] += dy
             r['coords'] = (new_x1, new_y1, new_x2, new_y2)
             canvas.coords(r['id'], new_x1, new_y1, new_x2, new_y2)
-        elif drag_state['drawing'] and viewer_state['temp_rect_id']:
+            refresh_handles()
+            refresh_dividers(r)
+
+        elif mode == 'draw' and viewer_state['temp_rect_id']:
             canvas.coords(viewer_state['temp_rect_id'], start_x, start_y, cx, cy)
 
     def on_button_release(event):
-        if drag_state['moving_rect'] is not None:
-            drag_state['moving_rect'] = None
+        mode = drag_state['mode']
+
+        if mode in ('resize', 'move'):
+            drag_state['mode'] = None
+            drag_state['target'] = None
             canvas.config(cursor="crosshair")
+            refresh_handles()
             return
 
-        if not drag_state['drawing']:
+        if mode != 'draw':
             return
 
-        drag_state['drawing'] = False
+        drag_state['mode'] = None
         end_x = canvas.canvasx(event.x)
         end_y = canvas.canvasy(event.y)
 
@@ -345,14 +419,79 @@ def main_menu():
         viewer_state['rectangles'].append({
             'id': viewer_state['temp_rect_id'],
             'type': draw_mode.get(),
-            'coords': (x1, y1, x2, y2)
+            'coords': (x1, y1, x2, y2),
+            'dividers': []
         })
         viewer_state['temp_rect_id'] = None
+        refresh_handles()
+
+    # -----------------------------------------------------------------
+    # Refresh divider lines for a single rectangle
+    # -----------------------------------------------------------------
+    def refresh_dividers(r):
+        """Redraw all divider lines of rectangle r to clamp inside its bounds."""
+        rx1, ry1, rx2, ry2 = r['coords']
+        for div in r.get('dividers', []):
+            if div.get('line_id'):
+                canvas.delete(div['line_id'])
+            if div['type'] == 'col':
+                x = max(rx1, min(div['x'], rx2))   # clamp
+                div['line_id'] = canvas.create_line(x, ry1, x, ry2, fill='blue', width=1, dash=(4, 2))
+            else:
+                y = max(ry1, min(div['y'], ry2))
+                div['line_id'] = canvas.create_line(rx1, y, rx2, y, fill='blue', width=1, dash=(4, 2))
+
+    # -----------------------------------------------------------------
+    # Right-click context menu: add divider lines to TABLE rectangles
+    # -----------------------------------------------------------------
+    def on_right_click(event):
+        cx = canvas.canvasx(event.x)
+        cy = canvas.canvasy(event.y)
+        r = find_rect_at(cx, cy)
+        if not r or r['type'] != 'table':
+            return   # only for table rectangles
+
+        menu = tk.Menu(root, tearoff=0)
+
+        def add_col_line():
+            rx1, ry1, rx2, ry2 = r['coords']
+            if not (rx1 < cx < rx2):
+                return
+            div = {'type': 'col', 'x': cx, 'line_id': None}
+            r['dividers'].append(div)
+            refresh_dividers(r)
+
+        def add_row_line():
+            rx1, ry1, rx2, ry2 = r['coords']
+            if not (ry1 < cy < ry2):
+                return
+            div = {'type': 'row', 'y': cy, 'line_id': None}
+            r['dividers'].append(div)
+            refresh_dividers(r)
+
+        def remove_last_divider():
+            if r['dividers']:
+                div = r['dividers'].pop()
+                if div.get('line_id'):
+                    canvas.delete(div['line_id'])
+
+        menu.add_command(label="Add Column Line", command=add_col_line)
+        menu.add_command(label="Add Row Line", command=add_row_line)
+        menu.add_separator()
+        menu.add_command(label="Remove Last Line", command=remove_last_divider)
+        menu.tk_popup(event.x_root, event.y_root)
+
 
     def clear_rectangles():
         for r in viewer_state['rectangles']:
             canvas.delete(r['id'])
+            for div in r.get('dividers', []):
+                if div.get('line_id'):
+                    canvas.delete(div['line_id'])
         viewer_state['rectangles'] = []
+        for hid in drag_state['handle_ids']:
+            canvas.delete(hid)
+        drag_state['handle_ids'] = []
         if viewer_state['temp_rect_id']:
             canvas.delete(viewer_state['temp_rect_id'])
             viewer_state['temp_rect_id'] = None
@@ -376,13 +515,41 @@ def main_menu():
                 
                 for i, r in enumerate(viewer_state['rectangles']):
                     crop = viewer_state['pil_image'].crop(r['coords'])
-                    
-                    config = '--psm 6' if r['type'] == 'table' else ''
-                    
-                    text = pytesseract.image_to_string(crop, lang='eng', config=config)
-                    
+                    rx1, ry1, rx2, ry2 = r['coords']
+
                     full_text += f"--- Block {i+1} ({r['type'].upper()}) ---\n"
-                    full_text += text.strip() + "\n\n"
+
+                    if r['type'] == 'table' and r.get('dividers'):
+                        # Build sorted cut positions
+                        col_cuts = sorted(set(
+                            int(d['x'] - rx1) for d in r['dividers'] if d['type'] == 'col'
+                        ))
+                        row_cuts = sorted(set(
+                            int(d['y'] - ry1) for d in r['dividers'] if d['type'] == 'row'
+                        ))
+                        w = rx2 - rx1
+                        h = ry2 - ry1
+                        col_boundaries = [0] + col_cuts + [int(w)]
+                        row_boundaries = [0] + row_cuts + [int(h)]
+
+                        rows_text = []
+                        for ri in range(len(row_boundaries) - 1):
+                            row_cells = []
+                            for ci in range(len(col_boundaries) - 1):
+                                cell = crop.crop((
+                                    col_boundaries[ci], row_boundaries[ri],
+                                    col_boundaries[ci+1], row_boundaries[ri+1]
+                                ))
+                                cell_text = pytesseract.image_to_string(
+                                    cell, lang='eng', config='--psm 6'
+                                ).strip().replace('\n', ' ')
+                                row_cells.append(cell_text)
+                            rows_text.append(' | '.join(row_cells))
+                        full_text += '\n'.join(rows_text) + '\n\n'
+                    else:
+                        config = '--psm 6' if r['type'] == 'table' else ''
+                        text = pytesseract.image_to_string(crop, lang='eng', config=config)
+                        full_text += text.strip() + '\n\n'
                     
                 def update_ui_end(text):
                     ocr_text.delete(1.0, tk.END)
@@ -399,6 +566,7 @@ def main_menu():
     canvas.bind("<ButtonPress-1>", on_button_press)
     canvas.bind("<B1-Motion>", on_move_press)
     canvas.bind("<ButtonRelease-1>", on_button_release)
+    canvas.bind("<ButtonPress-3>", on_right_click)
 
     # Viewer controls
     btn_prev = tk.Button(viewer_controls, text="◄ Prev", command=prev_page, **btn_style)
