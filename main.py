@@ -508,8 +508,8 @@ def main_menu():
                     ocr_text.insert(tk.END, "[Recognizing selected areas...]\n\n")
                 root.after(0, update_ui_start)
                 
-                if os.path.exists(r'C:\Users\phsds\Programming\PDF-Tools\tesseract.exe'):
-                    pytesseract.pytesseract.tesseract_cmd = r'C:\Users\phsds\Programming\PDF-Tools\tesseract.exe'
+                if os.path.exists(r'C:\Users\phsds\Programming\PDF-Tools\tesseract\tesseract.exe'):
+                    pytesseract.pytesseract.tesseract_cmd = r'C:\Users\phsds\Programming\PDF-Tools\tesseract\tesseract.exe'
                     
                 full_text = ""
                 
