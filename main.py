@@ -122,13 +122,7 @@ def main_menu():
     root = tk.Tk()
     root.title("PDF Tools (ABBYY Style)")
 
-    window_width = 1200
-    window_height = 800
-    screen_width = root.winfo_screenwidth()
-    screen_height = root.winfo_screenheight()
-    position_x = (screen_width // 2) - (window_width // 2)
-    position_y = (screen_height // 2) - (window_height // 2)
-    root.geometry(f"{window_width}x{window_height}+{position_x}+{position_y}")
+    root.state("zoomed")
     
     # Light Theme
     bg_main = "#f0f0f0"
@@ -168,7 +162,20 @@ def main_menu():
 
     # 6. Bottom Console
     console_frame = tk.Frame(v_paned, bg=bg_main)
-    v_paned.add(console_frame, minsize=100)
+    v_paned.add(console_frame, minsize=20)
+
+    def _adjust_sash(event=None):
+        if event and event.widget is not root:
+            return
+        try:
+            h = v_paned.winfo_height()
+            if h > 50:
+                v_paned.sash_place(0, 0, int(h * 0.8))
+        except Exception:
+            pass
+
+    root.bind("<Configure>", _adjust_sash, add="+")
+    root.after(100, _adjust_sash)
 
     # --- Setup PDF Viewer ---
     viewer_controls = tk.Frame(pdf_viewer_frame, bg=bg_main)
@@ -185,17 +192,210 @@ def main_menu():
     hbar.pack(side=tk.BOTTOM, fill=tk.X)
     canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-    # --- Setup OCR Text Editor ---
+    # --- Setup OCR Viewer (canvas único, estilo ABBYY) ---
     ocr_label = tk.Label(ocr_viewer_frame, text="Recognized Text", bg=bg_main, font=("Helvetica", 10, "bold"))
     ocr_label.pack(side=tk.TOP, fill=tk.X)
-    
-    ocr_text = ScrolledText(ocr_viewer_frame, wrap=tk.WORD, bg=bg_text, fg="black", font=("Times New Roman", 12))
-    ocr_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+    ocr_canvas_container = tk.Frame(ocr_viewer_frame, bg=bg_text)
+    ocr_canvas_container.pack(fill=tk.BOTH, expand=True)
+
+    ocr_canvas = tk.Canvas(ocr_canvas_container, bg=bg_text, highlightthickness=0)
+    ocr_cvbar = tk.Scrollbar(ocr_canvas_container, orient=tk.VERTICAL, command=ocr_canvas.yview)
+    ocr_chbar = tk.Scrollbar(ocr_canvas_container, orient=tk.HORIZONTAL, command=ocr_canvas.xview)
+    ocr_canvas.configure(yscrollcommand=ocr_cvbar.set, xscrollcommand=ocr_chbar.set)
+    ocr_cvbar.pack(side=tk.RIGHT, fill=tk.Y)
+    ocr_chbar.pack(side=tk.BOTTOM, fill=tk.X)
+    ocr_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+    right_canvas_items = []  # list of (canvas_item_id, widget) for cleanup
+
+    def _clear_right_canvas():
+        nonlocal right_canvas_items
+        for cid, wdg in right_canvas_items:
+            ocr_canvas.delete(cid)
+            if wdg:
+                wdg.destroy()
+        right_canvas_items = []
+        ocr_canvas.delete("all")
+
+    def draw_right_outlines():
+        """Lightweight: draws only rectangle borders and divider lines on the right canvas (no widgets)."""
+        ocr_canvas.delete("outlines")
+        rects = viewer_state['rectangles']
+        if not rects:
+            return
+
+        xs = [c for r in rects for c in (r['coords'][0], r['coords'][2])]
+        ys = [c for r in rects for c in (r['coords'][1], r['coords'][3])]
+        min_x, max_x = min(xs), max(xs)
+        min_y, max_y = min(ys), max(ys)
+        bw, bh = max_x - min_x, max_y - min_y
+        if bw == 0 or bh == 0:
+            return
+
+        ocr_canvas.update_idletasks()
+        cw = ocr_canvas.winfo_width() - 20
+        ch = ocr_canvas.winfo_height() - 20
+        if cw < 10 or ch < 10:
+            cw, ch = 400, 300
+
+        scale = min(cw / bw, ch / bh)
+        pad_x = (cw - bw * scale) / 2 + 10
+        pad_y = (ch - bh * scale) / 2 + 10
+
+        def tx(x): return (x - min_x) * scale + pad_x
+        def ty(y): return (y - min_y) * scale + pad_y
+
+        for r in rects:
+            x1, y1, x2, y2 = r['coords']
+            rx1, ry1 = tx(x1), ty(y1)
+            rx2, ry2 = tx(x2), ty(y2)
+
+            color = 'green' if r['type'] == 'text' else 'blue'
+            ocr_canvas.create_rectangle(rx1, ry1, rx2, ry2, outline=color, width=2, tags="outlines")
+
+            if r['type'] == 'table' and r.get('dividers'):
+                w = x2 - x1
+                h = y2 - y1
+                for d in r['dividers']:
+                    if d['type'] == 'col':
+                        lx = tx(d['x'])
+                        ocr_canvas.create_line(lx, ty(y1), lx, ty(y2), fill='blue', width=1, dash=(4, 2), tags="outlines")
+                    else:
+                        ly = ty(d['y'])
+                        ocr_canvas.create_line(tx(x1), ly, tx(x2), ly, fill='blue', width=1, dash=(4, 2), tags="outlines")
+
+        scroll = ocr_canvas.bbox("outlines")
+        if scroll:
+            ocr_canvas.config(scrollregion=scroll)
+
+    def render_right_panel():
+        _clear_right_canvas()
+        rects = viewer_state['rectangles']
+        if not rects:
+            return
+
+        xs = [c for r in rects for c in (r['coords'][0], r['coords'][2])]
+        ys = [c for r in rects for c in (r['coords'][1], r['coords'][3])]
+        min_x, max_x = min(xs), max(xs)
+        min_y, max_y = min(ys), max(ys)
+        bw, bh = max_x - min_x, max_y - min_y
+        if bw == 0 or bh == 0:
+            return
+
+        ocr_canvas.update_idletasks()
+        cw = ocr_canvas.winfo_width() - 20
+        ch = ocr_canvas.winfo_height() - 20
+        if cw < 10 or ch < 10:
+            cw, ch = 400, 300
+
+        scale = min(cw / bw, ch / bh)
+        pad_x = (cw - bw * scale) / 2 + 10
+        pad_y = (ch - bh * scale) / 2 + 10
+
+        def tx(x): return (x - min_x) * scale + pad_x
+        def ty(y): return (y - min_y) * scale + pad_y
+
+        for r in rects:
+            x1, y1, x2, y2 = r['coords']
+            rx1, ry1 = tx(x1), ty(y1)
+            rx2, ry2 = tx(x2), ty(y2)
+            rw = rx2 - rx1
+            rh = ry2 - ry1
+
+            if rw < 20 or rh < 20:
+                continue
+
+            is_table = r['type'] == 'table' and r.get('dividers')
+            color = 'green' if r['type'] == 'text' else 'blue'
+
+            # Draw border rectangle
+            ocr_canvas.create_rectangle(rx1, ry1, rx2, ry2, outline=color, width=2)
+
+            if is_table:
+                col_cuts = sorted(set(
+                    int(d['x'] - x1) for d in r['dividers'] if d['type'] == 'col'
+                ))
+                row_cuts = sorted(set(
+                    int(d['y'] - y1) for d in r['dividers'] if d['type'] == 'row'
+                ))
+                w = x2 - x1
+                h = y2 - y1
+                col_b = [0] + col_cuts + [int(w)]
+                row_b = [0] + row_cuts + [int(h)]
+
+                cell_grid = []
+                for ri in range(len(row_b) - 1):
+                    cy1 = ry1 + (row_b[ri] / h) * rh
+                    cy2 = ry1 + (row_b[ri+1] / h) * rh
+                    row_cells = []
+                    for ci in range(len(col_b) - 1):
+                        cx1 = rx1 + (col_b[ci] / w) * rw
+                        cx2 = rx1 + (col_b[ci+1] / w) * rw
+                        cell_w = cx2 - cx1 - 4
+                        cell_h = cy2 - cy1 - 4
+
+                        if cell_w < 10 or cell_h < 10:
+                            row_cells.append(None)
+                            continue
+
+                        cell = tk.Text(
+                            ocr_canvas,
+                            width=max(1, int(cell_w / 8)),
+                            height=max(1, int(cell_h / 18)),
+                            wrap=tk.WORD,
+                            font=("Consolas", 9),
+                            highlightthickness=2,
+                            highlightbackground="#222222",
+                            highlightcolor="#222222",
+                            relief="solid",
+                            bd=0,
+                            padx=3, pady=1,
+                            bg="#fafafa",
+                            fg="black",
+                            insertwidth=1
+                        )
+                        cid = ocr_canvas.create_window(
+                            cx1 + 2, cy1 + 2,
+                            anchor=tk.NW,
+                            window=cell,
+                            width=cell_w,
+                            height=cell_h
+                        )
+                        right_canvas_items.append((cid, cell))
+                        row_cells.append(cell)
+                    cell_grid.append(row_cells)
+                r['_right_cells'] = cell_grid
+            else:
+                widget = tk.Text(
+                    ocr_canvas,
+                    width=max(1, int(rw / 8)),
+                    height=max(1, int(rh / 18)),
+                    wrap=tk.WORD,
+                    font=("Consolas", 10),
+                    highlightthickness=0,
+                    bd=0,
+                    padx=4, pady=2,
+                    bg="#f0fff0",
+                    fg="black",
+                    insertwidth=1
+                )
+                cid = ocr_canvas.create_window(
+                    rx1, ry1,
+                    anchor=tk.NW,
+                    window=widget,
+                    width=rw,
+                    height=rh
+                )
+                right_canvas_items.append((cid, widget))
+                r['_right_widget'] = widget
+
+        ocr_canvas.config(scrollregion=ocr_canvas.bbox("all"))
 
     # --- Setup Console ---
     console_label = tk.Label(console_frame, text="Terminal Output", bg=bg_main, anchor="w")
     console_label.pack(side=tk.TOP, fill=tk.X)
-    output_text = ScrolledText(console_frame, wrap=tk.WORD, height=8, bg="#2e2e3e", fg="#ffffff", font=("Consolas", 10))
+    output_text = ScrolledText(console_frame, wrap=tk.WORD, height=2, bg="#2e2e3e", fg="#ffffff", font=("Consolas", 10))
     output_text.pack(fill=tk.BOTH, expand=True)
 
     # PDF State
@@ -228,6 +428,7 @@ def main_menu():
         page_label.config(text=f"Page {viewer_state['current_page'] + 1} of {viewer_state['num_pages']}")
         viewer_state['rectangles'] = []
         viewer_state['temp_rect_id'] = None
+        _clear_right_canvas()
 
     def prev_page():
         if viewer_state['current_page'] > 0:
@@ -398,6 +599,7 @@ def main_menu():
             drag_state['target'] = None
             canvas.config(cursor="crosshair")
             refresh_handles()
+            draw_right_outlines()
             return
 
         if mode != 'draw':
@@ -424,6 +626,7 @@ def main_menu():
         })
         viewer_state['temp_rect_id'] = None
         refresh_handles()
+        draw_right_outlines()
 
     # -----------------------------------------------------------------
     # Refresh divider lines for a single rectangle
@@ -460,6 +663,7 @@ def main_menu():
             div = {'type': 'col', 'x': cx, 'line_id': None}
             r['dividers'].append(div)
             refresh_dividers(r)
+            draw_right_outlines()
 
         def add_row_line():
             rx1, ry1, rx2, ry2 = r['coords']
@@ -468,12 +672,14 @@ def main_menu():
             div = {'type': 'row', 'y': cy, 'line_id': None}
             r['dividers'].append(div)
             refresh_dividers(r)
+            draw_right_outlines()
 
         def remove_last_divider():
             if r['dividers']:
                 div = r['dividers'].pop()
                 if div.get('line_id'):
                     canvas.delete(div['line_id'])
+            draw_right_outlines()
 
         menu.add_command(label="Add Column Line", command=add_col_line)
         menu.add_command(label="Add Row Line", command=add_row_line)
@@ -495,32 +701,26 @@ def main_menu():
         if viewer_state['temp_rect_id']:
             canvas.delete(viewer_state['temp_rect_id'])
             viewer_state['temp_rect_id'] = None
+        _clear_right_canvas()
 
     def recognize_areas():
         if not viewer_state['pil_image'] or not viewer_state['rectangles']:
             messagebox.showinfo("Info", "Please draw selection areas first.")
             return
-            
+
+        # Render the right panel (creates widgets for all blocks)
+        render_right_panel()
+
         def do_ocr():
             try:
-                def update_ui_start():
-                    ocr_text.delete(1.0, tk.END)
-                    ocr_text.insert(tk.END, "[Recognizing selected areas...]\n\n")
-                root.after(0, update_ui_start)
-                
                 if os.path.exists(r'C:\Users\phsds\Programming\PDF-Tools\tesseract\tesseract.exe'):
                     pytesseract.pytesseract.tesseract_cmd = r'C:\Users\phsds\Programming\PDF-Tools\tesseract\tesseract.exe'
-                    
-                full_text = ""
-                
+
                 for i, r in enumerate(viewer_state['rectangles']):
                     crop = viewer_state['pil_image'].crop(r['coords'])
                     rx1, ry1, rx2, ry2 = r['coords']
 
-                    full_text += f"--- Block {i+1} ({r['type'].upper()}) ---\n"
-
                     if r['type'] == 'table' and r.get('dividers'):
-                        # Build sorted cut positions
                         col_cuts = sorted(set(
                             int(d['x'] - rx1) for d in r['dividers'] if d['type'] == 'col'
                         ))
@@ -529,38 +729,38 @@ def main_menu():
                         ))
                         w = rx2 - rx1
                         h = ry2 - ry1
-                        col_boundaries = [0] + col_cuts + [int(w)]
-                        row_boundaries = [0] + row_cuts + [int(h)]
+                        col_b = [0] + col_cuts + [int(w)]
+                        row_b = [0] + row_cuts + [int(h)]
 
-                        rows_text = []
-                        for ri in range(len(row_boundaries) - 1):
-                            row_cells = []
-                            for ci in range(len(col_boundaries) - 1):
-                                cell = crop.crop((
-                                    col_boundaries[ci], row_boundaries[ri],
-                                    col_boundaries[ci+1], row_boundaries[ri+1]
-                                ))
-                                cell_text = pytesseract.image_to_string(
-                                    cell, lang='eng', config='--psm 6'
-                                ).strip().replace('\n', ' ')
-                                row_cells.append(cell_text)
-                            rows_text.append(' | '.join(row_cells))
-                        full_text += '\n'.join(rows_text) + '\n\n'
+                        cells = r.get('_right_cells', [])
+                        for ri in range(len(row_b) - 1):
+                            for ci in range(len(col_b) - 1):
+                                if ri < len(cells) and ci < len(cells[ri]) and cells[ri][ci] is not None:
+                                    cell_img = crop.crop((
+                                        col_b[ci], row_b[ri],
+                                        col_b[ci+1], row_b[ri+1]
+                                    ))
+                                    cell_text = pytesseract.image_to_string(
+                                        cell_img, lang='eng', config='--psm 6'
+                                    ).strip().replace('\n', ' ')
+
+                                    wdg = cells[ri][ci]
+                                    def _set_cell(w=wdg, t=cell_text):
+                                        w.delete(1.0, tk.END)
+                                        w.insert(tk.END, t)
+                                    root.after(0, _set_cell)
                     else:
-                        config = '--psm 6' if r['type'] == 'table' else ''
-                        text = pytesseract.image_to_string(crop, lang='eng', config=config)
-                        full_text += text.strip() + '\n\n'
-                    
-                def update_ui_end(text):
-                    ocr_text.delete(1.0, tk.END)
-                    ocr_text.insert(tk.END, text)
-                root.after(0, update_ui_end, full_text)
-                
+                        widget = r.get('_right_widget')
+                        if widget:
+                            text = pytesseract.image_to_string(crop, lang='eng', config='')
+                            def _set_text(w=widget, t=text):
+                                w.delete(1.0, tk.END)
+                                w.insert(tk.END, t.strip())
+                            root.after(0, _set_text)
+
             except Exception as e:
-                def update_ui_err(err):
-                    print(f"OCR Error: {err}")
-                root.after(0, update_ui_err, e)
-                
+                print(f"OCR Error: {e}")
+
         threading.Thread(target=do_ocr, daemon=True).start()
 
     canvas.bind("<ButtonPress-1>", on_button_press)
